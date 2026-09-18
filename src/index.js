@@ -8,12 +8,6 @@ import { round50, listPrice, nextPrice } from './price.js';
 // store. Move to R2 if this ever becomes a real photo library.
 const PHOTO = 'photo:';
 
-// The key can come from a Wrangler secret or from the in-app setup. The app
-// path exists because the terminal one is impossible on a phone.
-async function withKeys(env) {
-  return { ...env, GEMINI_API_KEY: env.GEMINI_API_KEY || (await env.KV.get('gemini_key')) };
-}
-
 const json = (o, status = 200) =>
   new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
 
@@ -85,7 +79,7 @@ async function route(p, req, env, ctx) {
     const counts = await db.prepare('SELECT status, COUNT(*) n FROM items GROUP BY status').all();
     return json({
       session: await V.hasSession(env),
-      ai: !!(env.GEMINI_API_KEY || (await env.KV.get('gemini_key'))),
+      ai: !!env.GEMINI_API_KEY,
       push: !!(await env.KV.get('push_sub')),
       version: env.APP_VERSION,
       apk_version: env.APK_VERSION,
@@ -100,12 +94,6 @@ async function route(p, req, env, ctx) {
     return json({ ok: true, cookies: n });
   }
 
-  if (p === '/api/settings' && req.method === 'POST') {
-    const { gemini_key } = await req.json();
-    if (gemini_key) await env.KV.put('gemini_key', gemini_key.trim());
-    return json({ ok: true });
-  }
-
   if (p === '/api/probe') return json(await V.probe(env));
 
   // Escape hatch for when Google retires a model again: lists what this key can
@@ -118,7 +106,7 @@ async function route(p, req, env, ctx) {
         try {
           const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
             method: 'POST',
-            headers: { 'content-type': 'application/json', 'x-goog-api-key': (await withKeys(env)).GEMINI_API_KEY },
+            headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
             body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ok' }] }] }),
             signal: AbortSignal.timeout(12000),
           });
@@ -128,7 +116,7 @@ async function route(p, req, env, ctx) {
       return json(out);
     }
     const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', {
-      headers: { 'x-goog-api-key': (await withKeys(env)).GEMINI_API_KEY },
+      headers: { 'x-goog-api-key': env.GEMINI_API_KEY },
     });
     const j = await r.json();
     return json(
@@ -263,8 +251,7 @@ async function analyse(env, id) {
       if (buf) b64.push(bufToB64(buf));
     }
 
-    const ai = await withKeys(env);
-    const a = await analysePhotos(ai, b64);
+    const a = await analysePhotos(env, b64);
 
     // Our own sold items are the only true transaction prices we have —
     // we know what was actually paid, offers included.
@@ -290,7 +277,7 @@ async function analyse(env, id) {
       if (/SESSION/.test(String(e.message))) a.missing.push('vinted');
     }
 
-    const price = await priceFromComparables(ai, a, [...comparables, ...ownSold]);
+    const price = await priceFromComparables(env, a, [...comparables, ...ownSold]);
 
     const list = listPrice(price.est_price, Number(env.BUMP_PCT));
     const floor = Math.max(3, round50(price.floor_price));

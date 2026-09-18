@@ -69,7 +69,8 @@ main{padding:0 20px;max-width:640px;margin:0 auto}
 .thumbs img:hover{transform:rotate(0) scale(1.06)}
 
 h2{font:600 17px/1.3 Inter;margin:2px 0 4px;letter-spacing:-.01em}
-p{margin:0 0 8px;color:var(--muted);font-size:13.5px;white-space:pre-wrap}
+p{margin:0 0 8px;color:var(--muted);font-size:13.5px}
+.note{white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 label{display:block;font:600 10.5px/1 Inter;color:var(--muted);letter-spacing:.08em;
   text-transform:uppercase;margin:14px 0 6px}
 input,textarea{width:100%;background:var(--page);color:var(--ink);border:1.5px solid transparent;
@@ -186,9 +187,6 @@ function locked() {
 }
 
 const STEPS = [
-  { key:'ai',      icon:'spark', title:'Collega l\'intelligenza artificiale',
-    body:'Serve una chiave Gemini per leggere le foto e scrivere gli annunci. È gratuita.',
-    cta:'Salva la chiave' },
   { key:'session', icon:'link',  title:'Collega il tuo account Vinted',
     body:'Così l\'app può pubblicare per te e seguire i prezzi.', cta:'Collega' },
   { key:'push',    icon:'bell',  title:'Attiva le notifiche',
@@ -202,11 +200,16 @@ function setupDone(st) { return STEPS.every((s) => st[s.key]); }
 
 function renderSetup(st) {
   const box = $('#setup');
+  // Not an onboarding step: the seller cannot fix this, and silently producing
+  // nothing would be worse than saying the server is misconfigured.
+  const broken = st.ai ? '' : `<div class="card setup"><h2>Servizio non configurato</h2>
+    <p style="margin:6px 0 0">Manca la chiave del modello lato server. L'analisi delle
+    foto non funzionerà finché non viene impostata.</p></div>`;
   if (setupDone(st)) { try { localStorage.setItem('onboarded','1'); } catch {} }
-  if (!showSetup && (setupDone(st) || onboarded())) { box.innerHTML = ''; return; }
+  if (!showSetup && (setupDone(st) || onboarded())) { box.innerHTML = broken; return; }
 
   const active = STEPS.findIndex((s) => !st[s.key]);
-  box.innerHTML = `<div class="card onb">
+  box.innerHTML = broken + `<div class="card onb">
     <div class="onb-h">${illu(active < 0 ? 'check' : STEPS[active].icon, 56)}
       <div><h2>${active < 0 ? 'Tutto pronto' : 'Benvenuto'}</h2>
       <p style="margin:0">${active < 0 ? 'Puoi modificare tutto da qui.'
@@ -226,12 +229,7 @@ function stepRow(step, st, isActive) {
   if (!isActive) return `<div class="step ${done ? 'done' : ''}">
     <span class="tick">${done ? '✓' : '·'}</span><span>${step.title}</span></div>`;
 
-  const field = step.key === 'ai'
-    ? `<input id="gk" type="password" placeholder="Incolla qui la chiave" autocomplete="off">
-       <p style="margin:8px 0 0;font-size:12.5px">Prendila gratis su
-       <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener"
-          style="color:var(--calypso)">aistudio.google.com/apikey</a>.</p>`
-    : step.key === 'session'
+  const field = step.key === 'session'
     ? `<p style="margin:0 0 4px;font-size:12.5px">Da <b>computer</b>, una volta sola: apri vinted.it
        già collegato, premi F12, incolla <code style="color:var(--calypso)">document.cookie</code>
        nella Console e copia il risultato. Il telefono non dovrà più farlo.</p>`
@@ -254,12 +252,6 @@ function apkBanner(st) {
 }
 
 window.setup = async (what) => {
-  if (what === 'ai') {
-    const k = $('#gk').value.trim();
-    if (!k) return;
-    await api('/settings', { method:'POST', body: JSON.stringify({ gemini_key: k }) });
-    return refresh();
-  }
   if (what === 'session') {
     const c = prompt('Incolla qui la stringa dei cookie di vinted.it (vedi istruzioni sopra).');
     if (!c) return;
@@ -293,7 +285,7 @@ function card(i) {
     return `${open}${head('<span class="sp"></span>')}${thumbs(i)}</div>`;
 
   if (i.status === 'error')
-    return `${open}${head(`<button class="sec" onclick="act(${i.id},'retry')">Riprova</button>`)}${thumbs(i)}<p>${esc(i.note)}</p></div>`;
+    return `${open}${head(`<button class="sec" onclick="act(${i.id},'retry')">Riprova</button>`)}${thumbs(i)}<p class="note">${esc(i.note)}</p></div>`;
 
   if (i.status === 'live' || i.status === 'sold')
     return `${open}${head(`<span class="v" style="margin-left:auto">${i.views||0} visite · ${i.favourites||0} preferiti</span>`)}

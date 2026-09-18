@@ -111,6 +111,25 @@ details[open] summary:before{content:'▾ '}
 .empty b{display:block;font:600 19px/1.3 Fraunces,Georgia,serif;color:var(--ink);margin-bottom:6px}
 /* Onboarding — one step at a time, then it gets out of the way for good. */
 .illu{color:var(--calypso);flex:none}
+/* Motion: the stroke writes itself once, then each mark loops the gesture it
+   depicts. One pass of "tratto", then "gesto" forever. */
+@keyframes draw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+@keyframes swing{0%,55%,100%{transform:rotate(0)}12%{transform:rotate(11deg)}28%{transform:rotate(-8deg)}42%{transform:rotate(4deg)}}
+@keyframes sway{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
+@keyframes snapA{0%,100%{transform:translateX(0)}40%{transform:translateX(-5px)}}
+@keyframes snapB{0%,100%{transform:translateX(0)}40%{transform:translateX(5px)}}
+@keyframes glow{0%,100%{opacity:1}45%{opacity:.45}}
+.illu path{stroke-dasharray:100;animation:draw 1.15s ease-in-out both}
+.illu path:nth-child(2){animation-delay:.16s}
+.illu path:nth-child(3){animation-delay:.32s}
+.i-bell{animation:swing 3.4s ease-in-out 1.5s infinite;transform-origin:50% 18%}
+.i-hanger{animation:sway 3.6s ease-in-out 1.5s infinite;transform-origin:50% 14%}
+.i-link path:nth-child(1){animation:draw 1.15s ease-in-out both,snapA 2.8s var(--overshoot) 1.5s infinite}
+.i-link path:nth-child(2){animation:draw 1.15s ease-in-out both .16s,snapB 2.8s var(--overshoot) 1.5s infinite}
+.i-check path{animation:draw 1.15s ease-in-out both,glow 2.8s ease-in-out 1.5s infinite}
+@media(prefers-reduced-motion:reduce){
+  .illu,.illu path{animation:none!important;stroke-dasharray:none!important}
+}
 .gear{padding:7px 11px;font-size:15px;line-height:1;border-radius:99px}
 .onb{padding:22px}
 .onb-h{display:flex;gap:16px;align-items:center;margin-bottom:18px}
@@ -145,14 +164,14 @@ code{font:500 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
    they read as a set. The rebrand unravels its logo into a single flowing
    line — same idea, and 2KB inline instead of a Lottie runtime. */
 const ILLU = {
-  hanger: `<path d="M32 15c0-3.3 2.7-6 6-6s6 2.7 6 6c0 2.6-1.7 4-4.3 5L32 23 8 36c-2.2 1.1-3.4 2.3-3.4 3.9 0 2 1.8 3.4 4.4 3.4h46c2.6 0 4.4-1.4 4.4-3.4 0-1.6-1.2-2.8-3.4-3.9L32 23"/>`,
-  spark:  `<path d="M24 8l3.6 9.9L37.5 21.5 27.6 25.1 24 35l-3.6-9.9L10.5 21.5l9.9-3.6z"/><path d="M45 32l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5-5.5-2 5.5-2z"/>`,
-  link:   `<path d="M27 40l-5.5 5.5a9.5 9.5 0 01-13.4-13.4L13.6 26.6"/><path d="M37 24l5.5-5.5a9.5 9.5 0 0113.4 13.4L50.4 37.4"/><path d="M25 39L39 25"/>`,
-  bell:   `<path d="M32 13a12.5 12.5 0 00-12.5 12.5v7.8L15 41h34l-4.5-7.7v-7.8A12.5 12.5 0 0032 13z"/><path d="M27.5 46a4.5 4.5 0 009 0"/><path d="M32 8.5V13"/>`,
-  check:  `<path d="M14 33l12 12 24-26"/>`,
+  hanger: `<path pathLength="100" d="M32 15c0-3.3 2.7-6 6-6s6 2.7 6 6c0 2.6-1.7 4-4.3 5L32 23 8 36c-2.2 1.1-3.4 2.3-3.4 3.9 0 2 1.8 3.4 4.4 3.4h46c2.6 0 4.4-1.4 4.4-3.4 0-1.6-1.2-2.8-3.4-3.9L32 23"/>`,
+  spark:  `<path pathLength="100" d="M24 8l3.6 9.9L37.5 21.5 27.6 25.1 24 35l-3.6-9.9L10.5 21.5l9.9-3.6z"/><path pathLength="100" d="M45 32l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5-5.5-2 5.5-2z"/>`,
+  link:   `<path pathLength="100" d="M18 23H30A9 9 0 0130 41H18A9 9 0 0118 23Z"/><path pathLength="100" d="M34 23H46A9 9 0 0146 41H34A9 9 0 0134 23Z"/>`,
+  bell:   `<path pathLength="100" d="M32 13a12.5 12.5 0 00-12.5 12.5v7.8L15 41h34l-4.5-7.7v-7.8A12.5 12.5 0 0032 13z"/><path pathLength="100" d="M27.5 46a4.5 4.5 0 009 0"/><path pathLength="100" d="M32 8.5V13"/>`,
+  check:  `<path pathLength="100" d="M14 33l12 12 24-26"/>`,
 };
 const illu = (name, size = 64) =>
-  `<svg class="illu" viewBox="0 0 64 64" width="${size}" height="${size}" fill="none"
+  `<svg class="illu i-${name}" viewBox="0 0 64 64" width="${size}" height="${size}" fill="none"
     stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
     aria-hidden="true">${ILLU[name]}</svg>`;
 
@@ -172,7 +191,8 @@ async function refresh() {
   if (st.error === 'unauthorized') return locked();
   CFG = st; $('#ver').textContent = 'v' + st.version;
   renderSetup(st); apkBanner(st);
-  items = d.items || []; render();
+  items = d.items || [];
+  render(!!document.querySelector('.onb'));  // one thing at a time
 }
 
 function locked() {
@@ -269,9 +289,9 @@ window.setup = async (what) => {
   }
 };
 
-function render() {
-  $('#list').innerHTML = items.map(card).join('') ||
-    `<div class="empty">${illu('hanger', 76)}<b>Niente da vendere, per ora</b>Fotografa un capo — meglio se includi l'etichetta —<br>e al resto pensa l'app.</div>`;
+function render(duringOnboarding) {
+  $('#list').innerHTML = items.map(card).join('') || (duringOnboarding ? '' :
+    `<div class="empty">${illu('hanger', 76)}<b>Niente da vendere, per ora</b>Fotografa un capo — meglio se includi l'etichetta —<br>e al resto pensa l'app.</div>`);
 }
 
 function thumbs(i) { return `<div class="thumbs">${i.photos.map(k =>

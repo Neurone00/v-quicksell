@@ -23,45 +23,139 @@ export async function saveSession(env, cookieString) {
   return cookies.length;
 }
 
-// Logs in with the user's own credentials inside the rendered browser, keeps
-// the resulting cookies, and forgets the password immediately — it is never
-// written to KV, D1 or a log. This exists so a phone can connect on its own;
-// the cookie paste stays as the fallback for when Vinted demands a captcha
-// or an emailed code, which no amount of automation can answer for you.
-export async function loginWithPassword(env, email, password) {
-  const browser = await puppeteer.launch(env.BROWSER);
-  try {
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 900 });
-    await page.goto(`https://${env.VINTED_HOST}/member/general/login`, {
-      waitUntil: 'domcontentloaded',
-      timeout: 45000,
+// Interactive login: we drive a real browser, stream it to the phone as
+// screenshots, and relay taps and typing back. The user signs in however they
+// normally do — Google, Apple, password — and we keep only the resulting
+// cookies. This exists because most Vinted accounts are social logins with no
+// password at all, and because a human can answer a captcha or an emailed code
+// where automation cannot (and should not).
+//
+// Costs real browser minutes: the Free plan allows ~10/day, and a login takes
+// two or three. It is a one-time action.
+
+// Installed before any page script and re-installed on every navigation, so it
+// records what the real site calls — the only reliable way to learn endpoints
+// that are not documented anywhere and that we have already seen move.
+const SNIFFER = () => {
+  window.__vqLog = window.__vqLog || [];
+  const keep = (e) => { if (window.__vqLog.length < 200) window.__vqLog.push(e); };
+  const body = (b) => {
+    try {
+      if (!b) return null;
+      if (typeof b === 'string') return b.slice(0, 400);
+      if (b instanceof FormData) return '[FormData ' + [...b.keys()].join(',') + ']';
+      return '[' + (b.constructor && b.constructor.name) + ']';
+    } catch { return null; }
+  };
+  const of = window.fetch;
+  window.fetch = async function (...a) {
+    const url = typeof a[0] === 'string' ? a[0] : (a[0] && a[0].url) || '';
+    const method = (a[1] && a[1].method) || (a[0] && a[0].method) || 'GET';
+    const r = await of.apply(this, a);
+    try { if (/\/api\//.test(url)) keep({ method, url, status: r.status, body: body(a[1] && a[1].body) }); } catch {}
+    return r;
+  };
+  const oo = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (m, u) { this.__vq = { m, u }; return oo.apply(this, arguments); };
+  const os = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function (b) {
+    const self = this;
+    this.addEventListener('load', () => {
+      try { if (self.__vq && /\/api\//.test(self.__vq.u))
+        keep({ method: self.__vq.m, url: self.__vq.u, status: self.status, body: body(b) }); } catch {}
     });
+    return os.apply(this, arguments);
+  };
+};
 
-    const emailSel = 'input[name="user[login]"], input[type="email"], #username';
-    const passSel = 'input[name="user[password]"], input[type="password"], #password';
-    await page.waitForSelector(emailSel, { timeout: 20000 });
-    await page.type(emailSel, email, { delay: 40 });
-    await page.type(passSel, password, { delay: 40 });
-    await page.keyboard.press('Enter');
-    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+// On reconnect, pages()[0] can be a leftover about:blank — pick the real one.
+async function livePage(browser) {
+  const pages = await browser.pages();
+  return pages.find((p) => p.url() && p.url() !== 'about:blank') || pages[0];
+}
 
-    const state = await page.evaluate(() => {
-      const t = (document.body?.innerText || '').toLowerCase();
-      if (/captcha|verifica di non essere|non sei un robot/.test(t)) return 'CAPTCHA';
-      if (/codice|verifica.*e-?mail|inserisci il codice/.test(t)) return 'OTP';
-      if (/password errata|credenziali|non valid/.test(t)) return 'BAD_CREDENTIALS';
-      return null;
-    });
-    if (state) throw new Error(state);
-
-    const cookies = await page.cookies();
-    if (!cookies.find((c) => /session|access_token/.test(c.name))) throw new Error('NO_COOKIE');
-    await env.KV.put(SESSION_KEY, JSON.stringify(cookies));
-    return cookies.length;
-  } finally {
-    await browser.close();
+async function snap(page) {
+  const raw = await page.screenshot({ type: 'jpeg', quality: 55 });
+  const vp = page.viewport() || { width: 400, height: 780 };
+  let b64;
+  if (typeof raw === 'string') b64 = raw;
+  else {
+    const u = new Uint8Array(raw);
+    let str = '';
+    for (let i = 0; i < u.length; i += 0x8000) str += String.fromCharCode(...u.subarray(i, i + 0x8000));
+    b64 = btoa(str);
   }
+  return { shot: b64, w: vp.width, h: vp.height };
+}
+
+// Ask the server, do not read the page. Two false positives made the earlier
+// text check useless: the "Iscriviti | Accedi" label is behind a hamburger on
+// mobile, and Vinted hands anonymous visitors a _vinted_fr_session cookie too —
+// so "has a session cookie" is not "is logged in". /api/v2/users/current
+// answers 200 authenticated and 403 anonymous, which is the real signal.
+async function loggedIn(page) {
+  return page.evaluate(async () => {
+    try {
+      const r = await fetch('/api/v2/users/current', {
+        credentials: 'include', headers: { accept: 'application/json' },
+      });
+      return r.status === 200;
+    } catch { return false; }
+  });
+}
+
+export async function browserStart(env) {
+  const browser = await puppeteer.launch(env.BROWSER, { keep_alive: 300000 });
+  const sessionId = browser.sessionId();
+  const page = (await browser.pages())[0] || (await browser.newPage());
+  await page.setViewport({ width: 400, height: 760, deviceScaleFactor: 1 });
+  await page.evaluateOnNewDocument(SNIFFER);
+  await page.goto(`https://${env.VINTED_HOST}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  const out = { sessionId, ...(await snap(page)) };
+  await browser.disconnect();   // disconnect, not close — the session stays warm
+  return out;
+}
+
+export async function browserAct(env, sessionId, act) {
+  const browser = await puppeteer.connect(env.BROWSER, sessionId);
+  try {
+    const page = await livePage(browser);
+    if (!page) throw new Error('SESSION_GONE');
+    await page.setViewport({ width: 400, height: 760, deviceScaleFactor: 1 });
+
+    if (act.type === 'click') await page.mouse.click(act.x, act.y);
+    else if (act.type === 'text') await page.keyboard.type(String(act.text), { delay: 25 });
+    else if (act.type === 'key') await page.keyboard.press(act.key || 'Enter');
+    else if (act.type === 'scroll') await page.evaluate((d) => window.scrollBy(0, d), act.dy || 400);
+    else if (act.type === 'back') await page.goBack({ timeout: 15000 }).catch(() => {});
+
+    // Give the page a beat to react; clicks may navigate.
+    await new Promise((r) => setTimeout(r, act.type === 'click' || act.type === 'key' ? 1600 : 500));
+
+    if (await loggedIn(page)) {
+      const cookies = await page.cookies();
+      if (cookies.find((c) => /session|access_token/.test(c.name))) {
+        await env.KV.put(SESSION_KEY, JSON.stringify(cookies));
+        const log = await page.evaluate(() => window.__vqLog || []).catch(() => []);
+        await browser.close();          // done with it — free the minutes
+        return { done: true, cookies: cookies.length, log };
+      }
+    }
+    const log = await page.evaluate(() => {
+      const l = window.__vqLog || [];
+      window.__vqLog = [];
+      return l;
+    }).catch(() => []);
+    return { done: false, log, ...(await snap(page)) };
+  } finally {
+    await browser.disconnect().catch(() => {});
+  }
+}
+
+export async function browserStop(env, sessionId) {
+  const browser = await puppeteer.connect(env.BROWSER, sessionId).catch(() => null);
+  if (browser) await browser.close().catch(() => {});
+  return { ok: true };
 }
 
 export async function hasSession(env) {

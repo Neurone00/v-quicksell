@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>V Quicksell</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f1115">
+<style>
+:root{--bg:#0f1115;--card:#181b22;--line:#272b35;--tx:#e8eaf0;--dim:#8d94a5;--ac:#09b1ba;--warn:#f0b429;--bad:#e2564d;--ok:#3ec46d}
+@media(prefers-color-scheme:light){:root{--bg:#f4f5f8;--card:#fff;--line:#e2e5ec;--tx:#14171d;--dim:#6b7280}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,system-ui,sans-serif;padding:0 0 100px}
+header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 16px calc(14px + env(safe-area-inset-top));display:flex;align-items:center;gap:10px;z-index:9}
+h1{font-size:17px;margin:0;flex:1}
+.v{font-size:11px;color:var(--dim)}
+main{padding:16px;max-width:680px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:10px;align-items:center}
+.thumbs{display:flex;gap:6px;overflow-x:auto;margin:-2px 0 10px}
+.thumbs img{width:72px;height:72px;object-fit:cover;border-radius:9px;flex:none;background:var(--line)}
+.badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.04em}
+.b-analyzing{background:#2a2f3d;color:var(--dim)}.b-pending{background:rgba(9,177,186,.16);color:var(--ac)}
+.b-needs_input{background:rgba(240,180,41,.16);color:var(--warn)}.b-live{background:rgba(62,196,109,.16);color:var(--ok)}
+.b-sold{background:rgba(62,196,109,.3);color:var(--ok)}.b-error{background:rgba(226,86,77,.16);color:var(--bad)}
+h2{font-size:15px;margin:0 0 4px}
+p{margin:0 0 8px;color:var(--dim);font-size:13px;white-space:pre-wrap}
+label{display:block;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin:10px 0 4px}
+input,textarea,select{width:100%;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font:inherit}
+textarea{min-height:96px;resize:vertical}
+button{background:var(--ac);color:#05262a;border:0;border-radius:10px;padding:11px 16px;font:600 15px/1 inherit;cursor:pointer}
+button.sec{background:transparent;color:var(--dim);border:1px solid var(--line)}
+button:disabled{opacity:.5}
+.fab{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));max-width:648px;margin:0 auto;padding:16px;font-size:16px;box-shadow:0 8px 28px rgba(0,0,0,.35);z-index:10}
+.prices{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.prices div{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px;text-align:center}
+.prices b{display:block;font-size:17px}.prices span{font-size:10px;color:var(--dim);text-transform:uppercase}
+.why{font-size:12px;color:var(--dim);background:var(--bg);border-radius:9px;padding:9px;margin:8px 0}
+.warn{color:var(--warn);font-size:12px;margin:6px 0}
+details summary{cursor:pointer;font-size:13px;color:var(--dim);margin:8px 0}
+.setup{border-color:var(--warn)}
+.sp{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--ac);border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px}
+@keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header><h1>V Quicksell</h1><span class="v" id="ver"></span></header>
+<main>
+  <div id="setup"></div>
+  <div id="list"></div>
+</main>
+<input type="file" id="file" accept="image/*" multiple hidden>
+<button class="fab" id="add">+ Aggiungi foto di un articolo</button>
+
+<script>
+let CFG = {};
+const $ = (s) => document.querySelector(s);
+const api = (p, o) => fetch('/api' + p, o).then((r) => r.json());
+const eur = (n) => (n == null ? '—' : '€' + Number(n).toFixed(2).replace('.00', ''));
+const esc = (s) => (s || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+
+let items = [];
+
+async function refresh() {
+  const [st, d] = await Promise.all([api('/status'), api('/items')]);
+  CFG = st;
+  $('#ver').textContent = 'v' + st.version;
+  apkBanner(st);
+  renderSetup(st);
+  items = d.items || [];
+  render();
+}
+
+function renderSetup(st) {
+  const missing = [];
+  if (!st.session) missing.push(['Collega Vinted', 'session']);
+  if (!st.ai) missing.push(['Manca la chiave Gemini (secret GEMINI_API_KEY)', null]);
+  if (!st.push) missing.push(['Attiva le notifiche', 'push']);
+  $('#setup').innerHTML = missing.length
+    ? `<div class="card setup"><h2>Configurazione</h2>${missing
+        .map(([t, a]) => `<div class="row" style="margin-top:8px"><span style="flex:1">${t}</span>${
+          a ? `<button class="sec" onclick="setup('${a}')">Configura</button>` : ''}</div>`)
+        .join('')}</div>`
+    : '';
+}
+
+// The TWA shell opens /?v=<its own version>. Sideloaded APKs get no Play Store
+// updates, so compare and offer the new one. The web content always self-updates.
+function apkBanner(st) {
+  const running = new URLSearchParams(location.search).get('v');
+  if (!running || running === st.apk_version) return;
+  $('#setup').insertAdjacentHTML('afterbegin',
+    `<div class="card setup"><div class="row"><span style="flex:1">Nuova versione dell'app: ${st.apk_version}</span>
+     <a href="/app.apk" download><button class="sec">Scarica</button></a></div></div>`);
+}
+
+window.setup = async (what) => {
+  if (what === 'session') {
+    const c = prompt(
+      'Apri vinted.it nel browser, loggati, apri DevTools > Application > Cookies, ' +
+      'copia TUTTI i cookie come "nome=valore; nome=valore" e incollali qui.\n\n' +
+      'Scorciatoia: nella console di vinted.it scrivi  document.cookie  e copia il risultato.'
+    );
+    if (!c) return;
+    const r = await api('/session', { method: 'POST', body: JSON.stringify({ cookie: c }) });
+    alert(r.error || `Collegato — ${r.cookies} cookie salvati.`);
+    refresh();
+  }
+  if (what === 'push') {
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    if ((await Notification.requestPermission()) !== 'granted') return alert('Notifiche rifiutate.');
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: Uint8Array.from(atob(CFG.vapid_public.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)),
+    });
+    await api('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
+    refresh();
+  }
+};
+
+function render() {
+  $('#list').innerHTML = items.map(card).join('') || '<p>Nessun articolo. Aggiungi le foto di un capo per iniziare.</p>';
+}
+
+function card(i) {
+  const st = { analyzing: 'Analisi', needs_input: 'Serve conferma', pending: 'Da approvare', live: 'Online', sold: 'Venduto', error: 'Errore', archived: '' }[i.status];
+  const th = i.photos.map((k) => `<img src="/api/photo/${encodeURIComponent(k)}" loading="lazy">`).join('');
+
+  if (i.status === 'analyzing')
+    return `<div class="card"><div class="row"><span class="badge b-analyzing">${st}</span><span class="sp"></span></div><div class="thumbs" style="margin-top:10px">${th}</div></div>`;
+
+  if (i.status === 'error')
+    return `<div class="card"><div class="row"><span class="badge b-error">${st}</span><button class="sec" onclick="act(${i.id},'retry')">Riprova</button></div><div class="thumbs" style="margin-top:10px">${th}</div><p>${esc(i.note)}</p></div>`;
+
+  if (i.status === 'live' || i.status === 'sold')
+    return `<div class="card"><div class="row"><span class="badge b-${i.status}">${st}</span><span class="v">${i.views || 0} visite · ${i.favourites || 0} preferiti</span></div>
+      <div class="thumbs" style="margin-top:10px">${th}</div>
+      <h2>${esc(i.title)}</h2>
+      <div class="prices"><div><b>${eur(i.current_price)}</b><span>ora</span></div><div><b>${eur(i.list_price)}</b><span>iniziale</span></div><div><b>${eur(i.floor_price)}</b><span>minimo</span></div></div>
+      ${i.status === 'live' ? `<p class="v">Prossimo calo del 5% ogni 3 giorni fino a ${eur(i.floor_price)}.</p>` : ''}</div>`;
+
+  // pending / needs_input — the approval card
+  const needBrand = i.needs.includes('brand');
+  const needSize = i.needs.includes('size');
+  return `<div class="card" id="c${i.id}">
+    <div class="row"><span class="badge b-${i.status}">${st}</span></div>
+    <div class="thumbs" style="margin-top:10px">${th}</div>
+    <label>Titolo</label><input id="t${i.id}" value="${esc(i.title)}" maxlength="60">
+    <label>Descrizione</label><textarea id="d${i.id}">${esc(i.description)}</textarea>
+    <div class="row" style="gap:10px">
+      <div style="flex:1"><label>Marca${needBrand ? ' ⚠' : ''}</label><input id="b${i.id}" value="${esc(i.brand)}" placeholder="—"></div>
+      <div style="flex:1"><label>Taglia${needSize ? ' ⚠' : ''}</label><input id="s${i.id}" value="${esc(i.size)}" placeholder="—"></div>
+    </div>
+    ${needBrand ? `<div class="warn">La marca non è leggibile su un'etichetta nelle foto. Confermala tu o aggiungi uno scatto dell'etichetta — un marchio non verificabile è la causa n.1 di rimozione degli annunci.</div>` : ''}
+    ${needSize && !i.size ? `<div class="warn">Taglia non trovata. Inseriscila: è il motivo n.1 di resi e recensioni negative.</div>` : ''}
+    <div class="prices">
+      <div><b>${eur(i.est_price)}</b><span>valore stimato</span></div>
+      <div><b><input id="p${i.id}" value="${i.list_price}" style="text-align:center;padding:2px;border:0;background:transparent;font:600 17px inherit"></b><span>pubblichi a</span></div>
+      <div><b><input id="f${i.id}" value="${i.floor_price}" style="text-align:center;padding:2px;border:0;background:transparent;font:600 17px inherit"></b><span>minimo</span></div>
+    </div>
+    ${i.comparables ? `<div class="why">${esc(i.comparables.reasoning)}<br><span class="v">Basato su ${i.comparables.sold} venduti e ${i.comparables.active} annunci attivi.</span></div>
+      <details><summary>Vedi i comparabili</summary>${i.comparables.sample.map((c) => `<div class="v">${c.sold ? '✔ venduto' : '· attivo'} — ${esc(c.title)} · ${eur(c.price)}</div>`).join('')}</details>` : ''}
+    <div class="row" style="margin-top:12px">
+      <button style="flex:1" onclick="approve(${i.id})">Pubblica su Vinted</button>
+      <button class="sec" onclick="act(${i.id},'reject')">Scarta</button>
+    </div>
+  </div>`;
+}
+
+window.act = async (id, what) => { await api(`/items/${id}/${what}`, { method: 'POST' }); refresh(); };
+
+window.approve = async (id) => {
+  const g = (p) => $('#' + p + id).value.trim();
+  const btn = event.target; btn.disabled = true; btn.textContent = 'Pubblico…';
+  const r = await api(`/items/${id}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({
+      title: g('t'), description: g('d'), brand: g('b'), size: g('s'),
+      list_price: Number(g('p')), floor_price: Number(g('f')), brand_confirmed: true,
+    }),
+  });
+  if (r.error) { alert(r.error); btn.disabled = false; btn.textContent = 'Pubblica su Vinted'; return; }
+  refresh();
+};
+
+$('#add').onclick = () => $('#file').click();
+$('#file').onchange = async (e) => {
+  const fd = new FormData();
+  for (const f of e.target.files) fd.append('photos', f);
+  $('#add').disabled = true; $('#add').textContent = 'Carico…';
+  await fetch('/api/items', { method: 'POST', body: fd });
+  $('#file').value = ''; $('#add').disabled = false; $('#add').textContent = '+ Aggiungi foto di un articolo';
+  refresh();
+};
+
+navigator.serviceWorker?.register('/sw.js').catch(() => {});
+refresh();
+setInterval(() => { if (items.some((i) => i.status === 'analyzing')) refresh(); }, 5000);
+</script>
+</body>
+</html>

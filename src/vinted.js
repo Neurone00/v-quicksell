@@ -253,8 +253,12 @@ function makeApi(page, env) {
 
 // Comparable listings for pricing.
 //
-// VERIFIED 2026-09-18 against the live site: /api/v2/catalog/items now returns
-// 404 — that JSON endpoint is gone. The catalog page is server-rendered and
+// VERIFIED 2026-09-18 against the live site: /api/v2/catalog/items answers 403
+// anonymously (and 404 under some bot-detection states — Vinted hides protected
+// routes that way). So the JSON API exists but needs a logged-in session, while
+// this scrape works with no session at all and no API rate limit. Once a real
+// session is connected, compare the two and keep whichever is steadier.
+// The catalog page is server-rendered and
 // every item link carries its data in the title attribute:
 //   "Felpa nike, Brand: Nike, Condizioni: Ottime, Taglia: M, 38.00 €, 40.60 €"
 // So we read the rendered page. Labels are Italian because this app is fixed
@@ -346,8 +350,9 @@ export async function updatePrice(api, vintedId, price) {
 }
 
 // Views/favourites/sold status for items we've listed.
+// /api/v2/items/{id} is deprecated — /details is the current one.
 export async function fetchStats(api, vintedId) {
-  const r = await api(`/api/v2/items/${vintedId}`);
+  const r = await api(`/api/v2/items/${vintedId}/details`);
   const it = r.item || r;
   return {
     views: it.view_count ?? 0,

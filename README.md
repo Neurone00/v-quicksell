@@ -31,7 +31,6 @@ npm run db:init
 ```bash
 npm run vapid                              # prints both VAPID values
 npx wrangler secret put VAPID_JWK          # paste the JSON it printed
-npx wrangler secret put GEMINI_API_KEY     # free key from aistudio.google.com
 npx wrangler secret put APP_SECRET         # any long random string — this is your login
 ```
 
@@ -46,12 +45,22 @@ npm run deploy
 Open `https://<your-worker>.workers.dev/?k=<APP_SECRET>` once — it sets a cookie
 and you won't need the key again on that device. On Android: menu → Add to home screen.
 
-### 4. Connect Vinted
+### 4. Finish in the app
 
-In the app, tap **Configura → Collega Vinted**. It asks for your cookies:
-open vinted.it logged in, console, type `document.cookie`, copy, paste.
+Open it and the onboarding walks you through three steps, once:
 
-**Your password never touches this app.** The session expires every few weeks —
+1. **Gemini key** — paste it in (free from aistudio.google.com/apikey). Stored in KV.
+2. **Vinted** — paste your cookie string. Do this **from a computer**: open vinted.it
+   logged in, F12, Console, `document.cookie`, copy. The session lives server-side,
+   so your phone never repeats it.
+3. **Notifications** — one tap.
+
+Once done the onboarding never returns; the ⚙ in the header reopens it.
+
+`GEMINI_API_KEY` also works as a Wrangler secret if you prefer the terminal —
+the secret wins over the in-app value.
+
+**Your Vinted password never touches this app.** The session expires every few weeks —
 the app will tell you when to re-paste.
 
 ### 5. Verify the Vinted API shapes — do this before your first real listing

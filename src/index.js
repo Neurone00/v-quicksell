@@ -94,6 +94,24 @@ async function route(p, req, env, ctx) {
     return json({ ok: true, cookies: n });
   }
 
+  if (p === '/api/session/login' && req.method === 'POST') {
+    const { email, password } = await req.json();
+    if (!email || !password) return json({ error: 'Email e password richieste.' }, 400);
+    try {
+      // The password is used for this one call and never stored anywhere.
+      return json({ ok: true, cookies: await V.loginWithPassword(env, email, password) });
+    } catch (e) {
+      const m = String(e.message);
+      const msg =
+        m.includes('BAD_CREDENTIALS') ? 'Email o password non corretti.'
+        : m.includes('CAPTCHA') ? 'Vinted ha chiesto un captcha. Usa il metodo con i cookie qui sotto.'
+        : m.includes('OTP') ? 'Vinted ha inviato un codice via email. Questo accesso va completato dal browser: usa il metodo con i cookie.'
+        : m.includes('NO_COOKIE') ? 'Accesso non riuscito: Vinted non ha restituito una sessione.'
+        : `Accesso non riuscito: ${m.slice(0, 120)}`;
+      return json({ error: msg }, 400);
+    }
+  }
+
   if (p === '/api/probe') return json(await V.probe(env));
 
   // Escape hatch for when Google retires a model again: lists what this key can
@@ -266,9 +284,9 @@ async function analyse(env, id) {
     let comparables = [];
     let category = null;
     try {
-      ({ comparables, category } = await V.withVinted(env, async (api) => ({
-        comparables: await V.searchComparables(api, a.search_query),
-        category: await V.findCategory(api, a.category_query),
+      ({ comparables, category } = await V.withVinted(env, async (api, page) => ({
+        comparables: await V.searchComparables(api, a.search_query, page),
+        category: await V.findCategory(),
       })));
     } catch (e) {
       // No session just means no market data. The vision work already succeeded —

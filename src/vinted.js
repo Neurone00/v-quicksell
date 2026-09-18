@@ -23,6 +23,47 @@ export async function saveSession(env, cookieString) {
   return cookies.length;
 }
 
+// Logs in with the user's own credentials inside the rendered browser, keeps
+// the resulting cookies, and forgets the password immediately — it is never
+// written to KV, D1 or a log. This exists so a phone can connect on its own;
+// the cookie paste stays as the fallback for when Vinted demands a captcha
+// or an emailed code, which no amount of automation can answer for you.
+export async function loginWithPassword(env, email, password) {
+  const browser = await puppeteer.launch(env.BROWSER);
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.goto(`https://${env.VINTED_HOST}/member/general/login`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 45000,
+    });
+
+    const emailSel = 'input[name="user[login]"], input[type="email"], #username';
+    const passSel = 'input[name="user[password]"], input[type="password"], #password';
+    await page.waitForSelector(emailSel, { timeout: 20000 });
+    await page.type(emailSel, email, { delay: 40 });
+    await page.type(passSel, password, { delay: 40 });
+    await page.keyboard.press('Enter');
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+
+    const state = await page.evaluate(() => {
+      const t = (document.body?.innerText || '').toLowerCase();
+      if (/captcha|verifica di non essere|non sei un robot/.test(t)) return 'CAPTCHA';
+      if (/codice|verifica.*e-?mail|inserisci il codice/.test(t)) return 'OTP';
+      if (/password errata|credenziali|non valid/.test(t)) return 'BAD_CREDENTIALS';
+      return null;
+    });
+    if (state) throw new Error(state);
+
+    const cookies = await page.cookies();
+    if (!cookies.find((c) => /session|access_token/.test(c.name))) throw new Error('NO_COOKIE');
+    await env.KV.put(SESSION_KEY, JSON.stringify(cookies));
+    return cookies.length;
+  } finally {
+    await browser.close();
+  }
+}
+
 export async function hasSession(env) {
   return !!(await env.KV.get(SESSION_KEY));
 }
@@ -64,6 +105,7 @@ export async function withVinted(env, fn) {
     // Persist refreshed cookies (incl. the Datadome token) for next time.
     await env.KV.put(SESSION_KEY, JSON.stringify(await page.cookies()));
 
+    page._vqHost = env.VINTED_HOST;
     return await fn(makeApi(page, env), page);
   } finally {
     await browser.close();
@@ -115,28 +157,53 @@ function makeApi(page, env) {
 // Operations
 // ---------------------------------------------------------------------------
 
-// Comparable listings for pricing. Captures the sold flag where Vinted exposes
-// it — sold comparables are worth far more than active ones.
-export async function searchComparables(api, query) {
-  const q = encodeURIComponent(query);
-  const r = await api(`/api/v2/catalog/items?search_text=${q}&per_page=40&order=relevance`);
-  return (r.items || []).map((it) => ({
-    title: it.title,
-    brand: it.brand_title || it.brand?.title,
-    size: it.size_title,
-    condition: it.status,
-    price: Number(it.price?.amount ?? it.price ?? 0),
-    // ponytail: Vinted has renamed this flag more than once. Check every
-    // plausible spelling rather than guess; false just means "treat as active".
-    sold: Boolean(it.is_sold ?? it.is_closed ?? it.item_closing_action ?? false),
-    url: it.url,
-  })).filter((c) => c.price > 0);
+// Comparable listings for pricing.
+//
+// VERIFIED 2026-09-18 against the live site: /api/v2/catalog/items now returns
+// 404 — that JSON endpoint is gone. The catalog page is server-rendered and
+// every item link carries its data in the title attribute:
+//   "Felpa nike, Brand: Nike, Condizioni: Ottime, Taglia: M, 38.00 €, 40.60 €"
+// So we read the rendered page. Labels are Italian because this app is fixed
+// to vinted.it; a different market needs its own labels.
+export async function searchComparables(api, query, page) {
+  await page.goto(`https://${page._vqHost}/catalog?search_text=${encodeURIComponent(query)}`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 45000,
+  });
+  await page.waitForSelector('a[href*="/items/"]', { timeout: 20000 }).catch(() => {});
+
+  return page.evaluate(() => {
+    const out = [];
+    for (const a of document.querySelectorAll('a[href*="/items/"]')) {
+      const t = a.getAttribute('title') || '';
+      if (!t) continue;
+      // Two prices are shown: the seller's ask, then the same plus buyer
+      // protection. We want the ask — the second would inflate every estimate.
+      const prices = [...t.matchAll(/(\d+[.,]\d{2})\s*€/g)].map((m) => parseFloat(m[1].replace(',', '.')));
+      if (!prices.length) continue;
+      out.push({
+        title: t.split(/,\s*(?:Brand|Condizioni|Taglia):/)[0].trim(),
+        brand: (/,\s*Brand:\s*([^,]+)/.exec(t) || [])[1]?.trim() || null,
+        condition: (/,\s*Condizioni:\s*([^,]+)/.exec(t) || [])[1]?.trim() || null,
+        size: (/,\s*Taglia:\s*([^,]+)/.exec(t) || [])[1]?.trim() || null,
+        price: prices[0],
+        // Search excludes sold items, so these are all active asks. The pricing
+        // prompt is told to treat active listings as an upper bound.
+        sold: false,
+        url: a.getAttribute('href'),
+      });
+    }
+    // De-duplicate: each card exposes more than one link to the same item.
+    const seen = new Set();
+    return out.filter((c) => !seen.has(c.url) && seen.add(c.url));
+  });
 }
 
-export async function findCategory(api, query) {
-  const r = await api(`/api/v2/catalog/items?search_text=${encodeURIComponent(query)}&per_page=5`);
-  const hit = (r.items || []).find((i) => i.catalog_id);
-  return hit ? { id: hit.catalog_id, path: hit.title } : null;
+// ponytail: returns null for now. The endpoint it used is gone, and the
+// category is only needed at posting time — which is itself unverified. The
+// approval card shows the gap rather than guessing a wrong category.
+export async function findCategory() {
+  return null;
 }
 
 // Uploads photos then creates the listing. Photos are fetched into the page
@@ -198,15 +265,16 @@ export async function fetchStats(api, vintedId) {
 
 // Setup helper: confirms the session works and the API shapes above still match.
 export async function probe(env) {
-  return withVinted(env, async (api) => {
-    const me = await api('/api/v2/users/current');
-    const search = await api('/api/v2/catalog/items?search_text=nike&per_page=3');
-    const sample = (search.items || [])[0] || {};
+  return withVinted(env, async (api, page) => {
+    const me = await api('/api/v2/users/current').catch((e) => ({ error: String(e.message).slice(0, 120) }));
+    const comps = await searchComparables(api, 'nike felpa', page);
     return {
-      user: me.user?.login || me.login || '(sconosciuto)',
-      search_ok: (search.items || []).length > 0,
-      sold_flag_present: ['is_sold', 'is_closed', 'item_closing_action'].filter((k) => k in sample),
-      sample_keys: Object.keys(sample).slice(0, 30),
+      user: me.user?.login || me.login || me.error || '(sconosciuto)',
+      comparables_found: comps.length,
+      comparables_sample: comps.slice(0, 3),
+      // Posting has never been executed. Until one listing goes up for real,
+      // treat createListing/updatePrice as unverified.
+      posting_verified: false,
     };
   });
 }

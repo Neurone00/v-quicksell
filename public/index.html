@@ -131,6 +131,14 @@ details[open] summary:before{content:'▾ '}
   .illu,.illu path{animation:none!important;stroke-dasharray:none!important}
 }
 .gear{padding:7px 11px;font-size:15px;line-height:1;border-radius:99px}
+/* Onboarding is a gate, not a banner: nothing behind it is reachable until
+   every step is satisfied. */
+#setup.gate{position:fixed;inset:0;z-index:100;background:var(--page);overflow-y:auto;
+  display:grid;align-content:center;gap:12px;
+  padding:calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom))}
+#setup.gate .card{max-width:560px;margin:0 auto;width:100%}
+body.gated{overflow:hidden}
+body.gated .fab{display:none}
 .onb{padding:22px}
 .onb-h{display:flex;gap:16px;align-items:center;margin-bottom:18px}
 .onb-h h2{margin:0 0 2px}
@@ -213,10 +221,16 @@ const STEPS = [
     body:'Ti avvisiamo solo quando un articolo è pronto da approvare.', cta:'Attiva' },
 ];
 
-const onboarded = () => localStorage.getItem('onboarded') === '1';
-let showSetup = false;
+// A step the browser has permanently refused cannot be satisfied by any action,
+// so it can be waived. Everything else is mandatory — no skipping into a
+// half-configured app that then fails silently.
+const waived = (k) => { try { return localStorage.getItem('waive_' + k) === '1'; } catch { return false; } };
+const pushBlocked = () => !('Notification' in window) || Notification.permission === 'denied';
+window.waive = (k) => { try { localStorage.setItem('waive_' + k, '1'); } catch {} refresh(); };
 
-function setupDone(st) { return STEPS.every((s) => st[s.key]); }
+let showSetup = false;
+const stepOk = (st, step) => st[step.key] || waived(step.key);
+function setupDone(st) { return STEPS.every((step) => stepOk(st, step)); }
 
 function renderSetup(st) {
   const box = $('#setup');
@@ -225,41 +239,53 @@ function renderSetup(st) {
   const broken = st.ai ? '' : `<div class="card setup"><h2>Servizio non configurato</h2>
     <p style="margin:6px 0 0">Manca la chiave del modello lato server. L'analisi delle
     foto non funzionerà finché non viene impostata.</p></div>`;
-  if (setupDone(st)) { try { localStorage.setItem('onboarded','1'); } catch {} }
-  if (!showSetup && (setupDone(st) || onboarded())) { box.innerHTML = broken; return; }
 
-  const active = STEPS.findIndex((s) => !st[s.key]);
+  const blocking = !setupDone(st);
+  const open = blocking || showSetup;
+  box.classList.toggle('gate', open);
+  document.body.classList.toggle('gated', open);
+  if (!open) { box.innerHTML = broken; return; }
+
+  const active = STEPS.findIndex((step) => !stepOk(st, step));
   box.innerHTML = broken + `<div class="card onb">
     <div class="onb-h">${illu(active < 0 ? 'check' : STEPS[active].icon, 56)}
       <div><h2>${active < 0 ? 'Tutto pronto' : 'Benvenuto'}</h2>
       <p style="margin:0">${active < 0 ? 'Puoi modificare tutto da qui.'
         : `Passaggio ${active + 1} di ${STEPS.length} — si fa una volta sola.`}</p></div></div>
     <div class="dots">${STEPS.map((_, i) =>
-      `<i class="${st[STEPS[i].key] ? 'ok' : i === active ? 'now' : ''}"></i>`).join('')}</div>
+      `<i class="${stepOk(st, STEPS[i]) ? 'ok' : i === active ? 'now' : ''}"></i>`).join('')}</div>
     ${STEPS.map((step, i) => stepRow(step, st, i === active)).join('')}
-    ${(active < 0 || onboarded()) ? `<button class="sec" style="width:100%;margin-top:14px"
-        onclick="showSetup=false;refresh()">Chiudi</button>`
-      : `<button class="sec" style="width:100%;margin-top:14px"
-        onclick="localStorage.setItem('onboarded','1');showSetup=false;refresh()">Lo faccio dopo</button>`}
+    ${blocking ? '' : `<button class="sec" style="width:100%;margin-top:14px"
+        onclick="showSetup=false;refresh()">Chiudi</button>`}
   </div>`;
 }
 
 function stepRow(step, st, isActive) {
-  const done = st[step.key];
+  const done = stepOk(st, step);
   if (!isActive) return `<div class="step ${done ? 'done' : ''}">
     <span class="tick">${done ? '✓' : '·'}</span><span>${step.title}</span></div>`;
 
   const field = step.key === 'session'
-    ? `<p style="margin:0 0 4px;font-size:12.5px">Da <b>computer</b>, una volta sola: apri vinted.it
-       già collegato, premi F12, incolla <code style="color:var(--calypso)">document.cookie</code>
-       nella Console e copia il risultato. Il telefono non dovrà più farlo.</p>`
+    ? `<input id="vmail" type="email" placeholder="Email Vinted" autocomplete="username"
+         style="margin-top:10px">
+       <input id="vpass" type="password" placeholder="Password Vinted" autocomplete="current-password"
+         style="margin-top:8px">
+       <p style="margin:8px 0 0;font-size:12px">La password serve solo per questo accesso e non
+       viene salvata da nessuna parte: l'app conserva la sessione, non le credenziali.</p>
+       <p style="margin:6px 0 0;font-size:12px"><a href="#" onclick="event.preventDefault();cookieFallback()"
+         style="color:var(--calypso)">Vinted chiede un captcha o un codice? Incolla i cookie</a></p>`
+    : '';
+
+  // Notifications denied at browser level: no button here can ever satisfy it.
+  const escape = step.key === 'push' && pushBlocked()
+    ? `<button class="sec" style="margin:12px 0 0 8px" onclick="waive('push')">Continua senza</button>`
     : '';
 
   return `<div class="step active">
     <span class="tick now">${STEPS.indexOf(step) + 1}</span>
     <div style="flex:1"><b>${step.title}</b><p style="margin:4px 0 0">${step.body}</p>
       ${field}
-      <button style="margin-top:12px" onclick="setup('${step.key}')">${step.cta}</button></div>
+      <button style="margin-top:12px" onclick="setup('${step.key}')">${step.cta}</button>${escape}</div>
   </div>`;
 }
 
@@ -273,10 +299,14 @@ function apkBanner(st) {
 
 window.setup = async (what) => {
   if (what === 'session') {
-    const c = prompt('Incolla qui la stringa dei cookie di vinted.it (vedi istruzioni sopra).');
-    if (!c) return;
-    const r = await api('/session', { method: 'POST', body: JSON.stringify({ cookie: c }) });
-    alert(r.error || `Collegato — ${r.cookies} cookie salvati.`); refresh();
+    const email = $('#vmail').value.trim(), password = $('#vpass').value;
+    if (!email || !password) return alert('Inserisci email e password.');
+    const b = event.target; b.disabled = true; b.textContent = 'Accesso…';
+    const r = await api('/session/login', { method:'POST', body: JSON.stringify({ email, password }) });
+    $('#vpass').value = '';                       // don't leave it sitting in the DOM
+    b.disabled = false; b.textContent = 'Collega';
+    if (r.error) return alert(r.error);
+    refresh();
   }
   if (what === 'push') {
     if (!('Notification' in window)) return alert('Notifiche non supportate su questo browser.');
@@ -350,6 +380,14 @@ window.approve = async (id) => {
     title:g('t'), description:g('d'), brand:g('b'), size:g('s'),
     list_price:Number(g('p')), floor_price:Number(g('f')), brand_confirmed:true }) });
   if (r.error) { alert(r.error); b.disabled = false; b.textContent = 'Pubblica su Vinted'; return; }
+  refresh();
+};
+
+window.cookieFallback = async () => {
+  const c = prompt('Da computer: apri vinted.it già collegato, F12 > Console, scrivi  document.cookie  e incolla qui il risultato.');
+  if (!c) return;
+  const r = await api('/session', { method:'POST', body: JSON.stringify({ cookie: c }) });
+  if (r.error) alert(r.error);
   refresh();
 };
 

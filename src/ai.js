@@ -2,9 +2,9 @@
 // ponytail: one model for vision + text + pricing. Workers AI vision was the
 // alternative but is worse at small care-label text and burns the free neurons.
 
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-3.6-flash';
 
-async function gemini(env, parts, schemaHint) {
+async function gemini(env, parts, schemaHint, attempt = 0) {
   const r = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
     {
@@ -23,10 +23,20 @@ async function gemini(env, parts, schemaHint) {
       }),
     }
   );
+
+  // 503/429 are routine on the free tier. Retrying beats parking a real item
+  // in an error state that needs a manual tap to clear.
+  // ponytail: short backoff on purpose. This runs inside waitUntil, and a long
+  // sleep there gets the whole background task evicted — which strands the item.
+  if ((r.status === 503 || r.status === 429) && attempt < 3) {
+    await new Promise((f) => setTimeout(f, 1200 * 2 ** attempt));
+    return gemini(env, parts, schemaHint, attempt + 1);
+  }
   if (!r.ok) throw new Error(`gemini ${r.status}: ${await r.text()}`);
+
   const j = await r.json();
   const text = j.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('gemini returned no content');
+  if (!text) throw new Error('gemini returned no content: ' + JSON.stringify(j).slice(0, 300));
   return JSON.parse(text);
 }
 

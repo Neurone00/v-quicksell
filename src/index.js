@@ -60,8 +60,10 @@ export default {
     }
   },
 
-  async scheduled(_event, env, ctx) {
-    ctx.waitUntil(priceRound(env));
+  // The analysis runs here, not in waitUntil: a scheduled invocation gets a real
+  // time budget, waitUntil-after-response does not and silently strands the item.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(event.cron === '0 9 * * *' ? priceRound(env) : drainQueue(env));
   },
 };
 
@@ -89,12 +91,27 @@ async function route(p, req, env, ctx) {
 
   if (p === '/api/probe') return json(await V.probe(env));
 
+  // The open app drains its own queue. A normal request has a real time budget;
+  // waitUntil-after-response does not, and the cron is best-effort.
+  if (p === '/api/drain' && req.method === 'POST') {
+    const did = await drainQueue(env);
+    return json({ processed: did });
+  }
+
   if (p === '/api/push/subscribe' && req.method === 'POST') {
     await env.KV.put('push_sub', JSON.stringify(await req.json()));
     return json({ ok: true });
   }
 
   if (p === '/api/items' && req.method === 'GET') {
+    // A background task can die without ever writing a status (eviction, limits).
+    // Nothing else would ever clear it, so sweep stale work into a retryable error.
+    await db
+      .prepare(
+        `UPDATE items SET status='error', note='Analisi interrotta. Tocca Riprova.'
+         WHERE status='analyzing' AND (started_at IS NULL OR (julianday('now') - julianday(started_at)) * 1440 > 3)`
+      )
+      .run();
     const { results } = await db
       .prepare("SELECT * FROM items WHERE status != 'archived' ORDER BY id DESC LIMIT 100")
       .all();
@@ -119,11 +136,9 @@ async function route(p, req, env, ctx) {
       keys.push(key);
     }
     const r = await db
-      .prepare("INSERT INTO items (status, photos) VALUES ('analyzing', ?) RETURNING id")
+      .prepare("INSERT INTO items (status, photos) VALUES ('queued', ?) RETURNING id")
       .bind(JSON.stringify(keys))
       .first();
-
-    ctx.waitUntil(analyse(env, r.id));
     return json({ id: r.id });
   }
 
@@ -142,13 +157,27 @@ async function route(p, req, env, ctx) {
       return json({ ok: true });
     }
     if (m[2] === 'retry') {
-      await db.prepare("UPDATE items SET status='analyzing', note=NULL WHERE id=?").bind(id).run();
-      ctx.waitUntil(analyse(env, id));
+      await db.prepare("UPDATE items SET status='queued', note=NULL WHERE id=?").bind(id).run();
       return json({ ok: true });
     }
   }
 
   return json({ error: 'not found' }, 404);
+}
+
+// One item per tick. Free-plan browser minutes are the scarce resource, and
+// nobody uploading a jumper cares about 60 seconds.
+async function drainQueue(env) {
+  const next = await env.DB
+    .prepare("SELECT id FROM items WHERE status='queued' ORDER BY id LIMIT 1")
+    .first();
+  if (!next) return null;
+  await env.DB
+    .prepare("UPDATE items SET status='analyzing', started_at=datetime('now') WHERE id=?")
+    .bind(next.id)
+    .run();
+  await analyse(env, next.id);
+  return next.id;
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +210,7 @@ async function analyse(env, id) {
     const keys = JSON.parse(item.photos);
 
     const b64 = [];
-    for (const k of keys.slice(0, 6)) {
+    for (const k of keys.slice(0, 4)) {
       const o = await env.R2.get(k);
       b64.push(bufToB64(await o.arrayBuffer()));
     }
@@ -206,8 +235,10 @@ async function analyse(env, id) {
         category: await V.findCategory(api, a.category_query),
       })));
     } catch (e) {
-      if (String(e.message).includes('SESSION')) return fail('Sessione Vinted scaduta — riconnetti.');
-      comparables = []; // price from model knowledge alone
+      // No session just means no market data. The vision work already succeeded —
+      // throwing it away would waste it and leave you with nothing to look at.
+      comparables = [];
+      if (/SESSION/.test(String(e.message))) a.missing.push('vinted');
     }
 
     const price = await priceFromComparables(env, a, [...comparables, ...ownSold]);
@@ -227,7 +258,9 @@ async function analyse(env, id) {
         category?.id || null, category?.path || null, a.condition, a.color || null, a.material || null,
         price.est_price, list, floor, list,
         JSON.stringify({ reasoning: price.reasoning, sold: comparables.filter((c) => c.sold).length, active: comparables.filter((c) => !c.sold).length, sample: comparables.slice(0, 8) }),
-        JSON.stringify(a.missing), null, id
+        JSON.stringify(a.missing),
+        a.missing.includes('vinted') ? 'Prezzo stimato senza comparabili: collega Vinted e tocca Riprova.' : null,
+        id
       )
       .run();
 

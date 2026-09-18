@@ -5,181 +5,230 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>V Quicksell</title>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f1115">
+<meta name="theme-color" content="#007782">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0f1115;--card:#181b22;--line:#272b35;--tx:#e8eaf0;--dim:#8d94a5;--ac:#09b1ba;--warn:#f0b429;--bad:#e2564d;--ok:#3ec46d}
-@media(prefers-color-scheme:light){:root{--bg:#f4f5f8;--card:#fff;--line:#e2e5ec;--tx:#14171d;--dim:#6b7280}}
+/* Vinted palette, sampled from vinted.it. Calypso darkened per the 2022 Kiln
+   rebrand and paired with mint — same move, same reason: legibility. */
+:root{
+  --calypso:#007782; --calypso-ink:#005760; --mint:#32AE88; --mint-soft:#D6EFE6;
+  --ink:#15191A; --muted:#5A6566; --page:#EDF2F2; --surface:#fff;
+  --line:rgba(21,25,26,.12); --warn:#B4690E; --warn-soft:#FBF0DD; --bad:#D4351C;
+  --r:18px; --overshoot:cubic-bezier(.34,1.42,.64,1);
+}
+@media(prefers-color-scheme:dark){:root{
+  --calypso:#2FC4CE; --calypso-ink:#7FE3EA; --mint:#4FD6A8; --mint-soft:#11302a;
+  --ink:#F2F5F5; --muted:#9BA7A8; --page:#0E1212; --surface:#171D1E;
+  --line:rgba(242,245,245,.14); --warn:#E8A33D; --warn-soft:#2A2213; --bad:#F2796B;
+}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,system-ui,sans-serif;padding:0 0 100px}
-header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 16px calc(14px + env(safe-area-inset-top));display:flex;align-items:center;gap:10px;z-index:9}
-h1{font-size:17px;margin:0;flex:1}
-.v{font-size:11px;color:var(--dim)}
-main{padding:16px;max-width:680px;margin:0 auto}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+body{margin:0;background:var(--page);color:var(--ink);
+  font:400 15px/1.55 Inter,-apple-system,system-ui,sans-serif;
+  padding:0 0 108px;-webkit-font-smoothing:antialiased}
+
+header{position:sticky;top:0;z-index:20;background:var(--page);
+  padding:calc(16px + env(safe-area-inset-top)) 20px 14px;display:flex;align-items:baseline;gap:10px}
+h1{font:600 25px/1 Fraunces,Georgia,serif;font-variation-settings:'SOFT' 60;
+  margin:0;flex:1;color:var(--calypso);letter-spacing:-.01em}
+.v{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+main{padding:0 20px;max-width:640px;margin:0 auto}
+
+/* The Kiln "flowing line": one continuous thread down the whole journey,
+   picking up each item's colour as it passes. */
+#list{position:relative;padding-left:26px}
+#list:before{content:'';position:absolute;left:5px;top:10px;bottom:10px;width:2px;border-radius:2px;
+  background:linear-gradient(180deg,var(--calypso),var(--mint) 55%,var(--line));opacity:.5}
+#list:empty:before{display:none}
+.card{position:relative;background:var(--surface);border-radius:var(--r);padding:18px;margin-bottom:14px;
+  box-shadow:0 1px 2px rgba(21,25,26,.06),0 8px 24px -14px rgba(21,25,26,.28);
+  animation:rise .4s var(--overshoot) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px) scale(.985)}}
+#list .card:before{content:'';position:absolute;left:-25px;top:24px;width:12px;height:12px;border-radius:50%;
+  background:var(--dot,var(--muted));box-shadow:0 0 0 4px var(--page)}
+.card[data-s=pending]{--dot:var(--calypso)} .card[data-s=needs_input]{--dot:var(--warn)}
+.card[data-s=live]{--dot:var(--mint)} .card[data-s=sold]{--dot:var(--mint)}
+.card[data-s=error]{--dot:var(--bad)}
+
 .row{display:flex;gap:10px;align-items:center}
-.thumbs{display:flex;gap:6px;overflow-x:auto;margin:-2px 0 10px}
-.thumbs img{width:72px;height:72px;object-fit:cover;border-radius:9px;flex:none;background:var(--line)}
-.badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.04em}
-.b-analyzing{background:#2a2f3d;color:var(--dim)}.b-pending{background:rgba(9,177,186,.16);color:var(--ac)}
-.b-needs_input{background:rgba(240,180,41,.16);color:var(--warn)}.b-live{background:rgba(62,196,109,.16);color:var(--ok)}
-.b-sold{background:rgba(62,196,109,.3);color:var(--ok)}.b-error{background:rgba(226,86,77,.16);color:var(--bad)}
-h2{font-size:15px;margin:0 0 4px}
-p{margin:0 0 8px;color:var(--dim);font-size:13px;white-space:pre-wrap}
-label{display:block;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;margin:10px 0 4px}
-input,textarea,select{width:100%;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font:inherit}
-textarea{min-height:96px;resize:vertical}
-button{background:var(--ac);color:#05262a;border:0;border-radius:10px;padding:11px 16px;font:600 15px/1 inherit;cursor:pointer}
-button.sec{background:transparent;color:var(--dim);border:1px solid var(--line)}
-button:disabled{opacity:.5}
-.fab{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));max-width:648px;margin:0 auto;padding:16px;font-size:16px;box-shadow:0 8px 28px rgba(0,0,0,.35);z-index:10}
-.prices{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
-.prices div{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px;text-align:center}
-.prices b{display:block;font-size:17px}.prices span{font-size:10px;color:var(--dim);text-transform:uppercase}
-.why{font-size:12px;color:var(--dim);background:var(--bg);border-radius:9px;padding:9px;margin:8px 0}
-.warn{color:var(--warn);font-size:12px;margin:6px 0}
-details summary{cursor:pointer;font-size:13px;color:var(--dim);margin:8px 0}
-.setup{border-color:var(--warn)}
-.sp{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--ac);border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px}
-@keyframes s{to{transform:rotate(360deg)}}
+.badge{font:600 11px/1 Inter;letter-spacing:.06em;text-transform:uppercase;padding:6px 10px;border-radius:99px;
+  background:var(--page);color:var(--muted)}
+.badge.pending{background:color-mix(in srgb,var(--calypso) 13%,transparent);color:var(--calypso)}
+.badge.needs_input{background:var(--warn-soft);color:var(--warn)}
+.badge.live,.badge.sold{background:var(--mint-soft);color:var(--mint)}
+.badge.error{background:color-mix(in srgb,var(--bad) 13%,transparent);color:var(--bad)}
+
+/* Tactile frames: the rebrand's "imperfection and a human touch". */
+.thumbs{display:flex;gap:10px;overflow-x:auto;padding:12px 4px;margin:0 -4px;scrollbar-width:none}
+.thumbs::-webkit-scrollbar{display:none}
+.thumbs img{width:84px;height:84px;object-fit:cover;border-radius:12px;flex:none;background:var(--page);
+  box-shadow:0 2px 10px -4px rgba(21,25,26,.4);transition:transform .3s var(--overshoot)}
+.thumbs img:nth-child(odd){transform:rotate(-1.4deg)}
+.thumbs img:nth-child(even){transform:rotate(1.1deg)}
+.thumbs img:hover{transform:rotate(0) scale(1.06)}
+
+h2{font:600 17px/1.3 Inter;margin:2px 0 4px;letter-spacing:-.01em}
+p{margin:0 0 8px;color:var(--muted);font-size:13.5px;white-space:pre-wrap}
+label{display:block;font:600 10.5px/1 Inter;color:var(--muted);letter-spacing:.08em;
+  text-transform:uppercase;margin:14px 0 6px}
+input,textarea{width:100%;background:var(--page);color:var(--ink);border:1.5px solid transparent;
+  border-radius:12px;padding:11px 13px;font:400 15px/1.4 Inter;transition:border-color .16s}
+input:focus,textarea:focus{outline:0;border-color:var(--calypso);background:var(--surface)}
+textarea{min-height:104px;resize:vertical}
+
+button{background:var(--calypso);color:#fff;border:0;border-radius:99px;padding:13px 20px;
+  font:600 15px/1 Inter;cursor:pointer;transition:transform .18s var(--overshoot),filter .18s}
+button:hover{filter:brightness(1.08)} button:active{transform:scale(.96)}
+button.sec{background:transparent;color:var(--muted);box-shadow:inset 0 0 0 1.5px var(--line)}
+button:disabled{opacity:.45;pointer-events:none}
+@media(prefers-color-scheme:dark){button{color:#04211f}}
+
+.fab{position:fixed;left:20px;right:20px;bottom:calc(20px + env(safe-area-inset-bottom));
+  max-width:600px;margin:0 auto;padding:17px;font-size:16px;z-index:30;
+  box-shadow:0 10px 34px -10px color-mix(in srgb,var(--calypso) 70%,transparent)}
+
+.prices{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:14px 0 4px}
+.prices div{background:var(--page);border-radius:13px;padding:11px 6px;text-align:center}
+.prices b{display:block;font:600 19px/1.2 Inter;font-variant-numeric:tabular-nums}
+.prices span{font:500 9.5px/1.4 Inter;color:var(--muted);letter-spacing:.07em;text-transform:uppercase}
+.prices input{text-align:center;padding:0;border:0;background:transparent;
+  font:600 19px/1.2 Inter;font-variant-numeric:tabular-nums;color:var(--calypso)}
+.prices input:focus{background:transparent;border-color:transparent;text-decoration:underline}
+
+.why{font-size:12.5px;color:var(--muted);background:var(--page);border-radius:13px;padding:11px 13px;margin:10px 0;
+  border-left:3px solid var(--calypso)}
+.warn{font-size:12.5px;color:var(--warn);background:var(--warn-soft);border-radius:12px;padding:10px 12px;margin:8px 0}
+details summary{cursor:pointer;font-size:12.5px;color:var(--muted);margin:10px 0;list-style:none}
+details summary:before{content:'▸ ';transition:.2s}
+details[open] summary:before{content:'▾ '}
+.setup{box-shadow:inset 0 0 0 1.5px var(--warn),0 8px 24px -16px rgba(21,25,26,.3)}
+.sp{width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--calypso);
+  border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.empty{text-align:center;color:var(--muted);padding:56px 20px;font-size:14px}
+.empty b{display:block;font:600 19px/1.3 Fraunces,Georgia,serif;color:var(--ink);margin-bottom:6px}
 </style>
 </head>
 <body>
-<header><h1>V Quicksell</h1><span class="v" id="ver"></span></header>
-<main>
-  <div id="setup"></div>
-  <div id="list"></div>
-</main>
+<header><h1>Quicksell</h1><span class="v" id="ver"></span></header>
+<main><div id="setup"></div><div id="list"></div></main>
 <input type="file" id="file" accept="image/*" multiple hidden>
-<button class="fab" id="add">+ Aggiungi foto di un articolo</button>
+<button class="fab" id="add">Aggiungi le foto di un capo</button>
 
 <script>
-let CFG = {};
 const $ = (s) => document.querySelector(s);
 const api = (p, o) => fetch('/api' + p, o).then((r) => r.json());
 const eur = (n) => (n == null ? '—' : '€' + Number(n).toFixed(2).replace('.00', ''));
 const esc = (s) => (s || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+let items = [], CFG = {};
 
-let items = [];
+const LABEL = { queued:'In coda', analyzing:'Analisi', needs_input:'Serve conferma',
+  pending:'Da approvare', live:'Online', sold:'Venduto', error:'Errore' };
 
 async function refresh() {
   const [st, d] = await Promise.all([api('/status'), api('/items')]);
-  CFG = st;
-  $('#ver').textContent = 'v' + st.version;
-  apkBanner(st);
-  renderSetup(st);
-  items = d.items || [];
-  render();
+  CFG = st; $('#ver').textContent = 'v' + st.version;
+  renderSetup(st); apkBanner(st);
+  items = d.items || []; render();
 }
 
 function renderSetup(st) {
-  const missing = [];
-  if (!st.session) missing.push(['Collega Vinted', 'session']);
-  if (!st.ai) missing.push(['Manca la chiave Gemini (secret GEMINI_API_KEY)', null]);
-  if (!st.push) missing.push(['Attiva le notifiche', 'push']);
-  $('#setup').innerHTML = missing.length
-    ? `<div class="card setup"><h2>Configurazione</h2>${missing
-        .map(([t, a]) => `<div class="row" style="margin-top:8px"><span style="flex:1">${t}</span>${
-          a ? `<button class="sec" onclick="setup('${a}')">Configura</button>` : ''}</div>`)
-        .join('')}</div>`
-    : '';
+  const m = [];
+  if (!st.session) m.push(['Collega il tuo account Vinted', 'session']);
+  if (!st.ai) m.push(['Manca la chiave Gemini', null]);
+  if (!st.push) m.push(['Attiva le notifiche', 'push']);
+  $('#setup').innerHTML = m.length ? `<div class="card setup"><h2>Quasi pronto</h2>${m.map(([t, a]) =>
+    `<div class="row" style="margin-top:10px"><span style="flex:1;font-size:14px">${t}</span>${
+      a ? `<button class="sec" onclick="setup('${a}')">Configura</button>` : ''}</div>`).join('')}</div>` : '';
 }
 
-// The TWA shell opens /?v=<its own version>. Sideloaded APKs get no Play Store
-// updates, so compare and offer the new one. The web content always self-updates.
 function apkBanner(st) {
-  const running = new URLSearchParams(location.search).get('v');
-  if (!running || running === st.apk_version) return;
-  $('#setup').insertAdjacentHTML('afterbegin',
-    `<div class="card setup"><div class="row"><span style="flex:1">Nuova versione dell'app: ${st.apk_version}</span>
-     <a href="/app.apk" download><button class="sec">Scarica</button></a></div></div>`);
+  const r = new URLSearchParams(location.search).get('v');
+  if (!r || r === st.apk_version) return;
+  $('#setup').insertAdjacentHTML('afterbegin', `<div class="card setup"><div class="row">
+    <span style="flex:1">Nuova versione: ${st.apk_version}</span>
+    <a href="/app.apk" download><button class="sec">Scarica</button></a></div></div>`);
 }
 
 window.setup = async (what) => {
   if (what === 'session') {
-    const c = prompt(
-      'Apri vinted.it nel browser, loggati, apri DevTools > Application > Cookies, ' +
-      'copia TUTTI i cookie come "nome=valore; nome=valore" e incollali qui.\n\n' +
-      'Scorciatoia: nella console di vinted.it scrivi  document.cookie  e copia il risultato.'
-    );
+    const c = prompt('Su vinted.it (già loggato) apri la console e scrivi:  document.cookie\nCopia il risultato e incollalo qui.');
     if (!c) return;
     const r = await api('/session', { method: 'POST', body: JSON.stringify({ cookie: c }) });
-    alert(r.error || `Collegato — ${r.cookies} cookie salvati.`);
-    refresh();
+    alert(r.error || `Collegato — ${r.cookies} cookie salvati.`); refresh();
   }
   if (what === 'push') {
     const reg = await navigator.serviceWorker.register('/sw.js');
-    if ((await Notification.requestPermission()) !== 'granted') return alert('Notifiche rifiutate.');
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: Uint8Array.from(atob(CFG.vapid_public.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)),
-    });
+    if ((await Notification.requestPermission()) !== 'granted') return;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true,
+      applicationServerKey: Uint8Array.from(atob(CFG.vapid_public.replace(/-/g,'+').replace(/_/g,'/')), c=>c.charCodeAt(0)) });
     await api('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
     refresh();
   }
 };
 
 function render() {
-  $('#list').innerHTML = items.map(card).join('') || '<p>Nessun articolo. Aggiungi le foto di un capo per iniziare.</p>';
+  $('#list').innerHTML = items.map(card).join('') ||
+    `<div class="empty"><b>Niente da vendere, per ora</b>Fotografa un capo — meglio se includi l'etichetta —<br>e al resto pensa l'app.</div>`;
 }
+
+function thumbs(i) { return `<div class="thumbs">${i.photos.map(k =>
+  `<img src="/api/photo/${encodeURIComponent(k)}" loading="lazy" alt="">`).join('')}</div>`; }
 
 function card(i) {
-  const st = { analyzing: 'Analisi', needs_input: 'Serve conferma', pending: 'Da approvare', live: 'Online', sold: 'Venduto', error: 'Errore', archived: '' }[i.status];
-  const th = i.photos.map((k) => `<img src="/api/photo/${encodeURIComponent(k)}" loading="lazy">`).join('');
+  const head = (extra = '') => `<div class="row"><span class="badge ${i.status}">${LABEL[i.status]}</span>${extra}</div>`;
+  const open = `<div class="card" data-s="${i.status}">`;
 
-  if (i.status === 'analyzing')
-    return `<div class="card"><div class="row"><span class="badge b-analyzing">${st}</span><span class="sp"></span></div><div class="thumbs" style="margin-top:10px">${th}</div></div>`;
+  if (i.status === 'analyzing' || i.status === 'queued')
+    return `${open}${head('<span class="sp"></span>')}${thumbs(i)}</div>`;
 
   if (i.status === 'error')
-    return `<div class="card"><div class="row"><span class="badge b-error">${st}</span><button class="sec" onclick="act(${i.id},'retry')">Riprova</button></div><div class="thumbs" style="margin-top:10px">${th}</div><p>${esc(i.note)}</p></div>`;
+    return `${open}${head(`<button class="sec" onclick="act(${i.id},'retry')">Riprova</button>`)}${thumbs(i)}<p>${esc(i.note)}</p></div>`;
 
   if (i.status === 'live' || i.status === 'sold')
-    return `<div class="card"><div class="row"><span class="badge b-${i.status}">${st}</span><span class="v">${i.views || 0} visite · ${i.favourites || 0} preferiti</span></div>
-      <div class="thumbs" style="margin-top:10px">${th}</div>
-      <h2>${esc(i.title)}</h2>
-      <div class="prices"><div><b>${eur(i.current_price)}</b><span>ora</span></div><div><b>${eur(i.list_price)}</b><span>iniziale</span></div><div><b>${eur(i.floor_price)}</b><span>minimo</span></div></div>
-      ${i.status === 'live' ? `<p class="v">Prossimo calo del 5% ogni 3 giorni fino a ${eur(i.floor_price)}.</p>` : ''}</div>`;
+    return `${open}${head(`<span class="v" style="margin-left:auto">${i.views||0} visite · ${i.favourites||0} preferiti</span>`)}
+      ${thumbs(i)}<h2>${esc(i.title)}</h2>
+      <div class="prices"><div><b>${eur(i.current_price)}</b><span>ora</span></div>
+        <div><b>${eur(i.list_price)}</b><span>iniziale</span></div>
+        <div><b>${eur(i.floor_price)}</b><span>minimo</span></div></div>
+      ${i.status==='live' ? `<p style="margin-top:10px">−5% ogni 3 giorni, fino a ${eur(i.floor_price)}.</p>` : ''}</div>`;
 
-  // pending / needs_input — the approval card
-  const needBrand = i.needs.includes('brand');
-  const needSize = i.needs.includes('size');
-  return `<div class="card" id="c${i.id}">
-    <div class="row"><span class="badge b-${i.status}">${st}</span></div>
-    <div class="thumbs" style="margin-top:10px">${th}</div>
+  const nb = i.needs.includes('brand'), ns = i.needs.includes('size');
+  return `${open}${head()}${thumbs(i)}
     <label>Titolo</label><input id="t${i.id}" value="${esc(i.title)}" maxlength="60">
     <label>Descrizione</label><textarea id="d${i.id}">${esc(i.description)}</textarea>
-    <div class="row" style="gap:10px">
-      <div style="flex:1"><label>Marca${needBrand ? ' ⚠' : ''}</label><input id="b${i.id}" value="${esc(i.brand)}" placeholder="—"></div>
-      <div style="flex:1"><label>Taglia${needSize ? ' ⚠' : ''}</label><input id="s${i.id}" value="${esc(i.size)}" placeholder="—"></div>
+    <div class="row" style="gap:12px;align-items:flex-start">
+      <div style="flex:1"><label>Marca${nb?' ⚠':''}</label><input id="b${i.id}" value="${esc(i.brand)}" placeholder="—"></div>
+      <div style="flex:1"><label>Taglia${ns?' ⚠':''}</label><input id="s${i.id}" value="${esc(i.size)}" placeholder="—"></div>
     </div>
-    ${needBrand ? `<div class="warn">La marca non è leggibile su un'etichetta nelle foto. Confermala tu o aggiungi uno scatto dell'etichetta — un marchio non verificabile è la causa n.1 di rimozione degli annunci.</div>` : ''}
-    ${needSize && !i.size ? `<div class="warn">Taglia non trovata. Inseriscila: è il motivo n.1 di resi e recensioni negative.</div>` : ''}
+    ${nb?`<div class="warn">La marca non si legge su un'etichetta nelle foto. Confermala o aggiungi uno scatto dell'etichetta: un marchio non verificabile è la causa n.1 di rimozione.</div>`:''}
+    ${i.needs.includes('vinted')?`<div class="warn">Prezzo stimato senza dati di mercato — Vinted non era collegato. Collegalo e tocca Riprova.</div>`:''}
+    ${ns&&!i.size?`<div class="warn">Taglia non trovata. Inseriscila: è il motivo n.1 di resi.</div>`:''}
     <div class="prices">
       <div><b>${eur(i.est_price)}</b><span>valore stimato</span></div>
-      <div><b><input id="p${i.id}" value="${i.list_price}" style="text-align:center;padding:2px;border:0;background:transparent;font:600 17px inherit"></b><span>pubblichi a</span></div>
-      <div><b><input id="f${i.id}" value="${i.floor_price}" style="text-align:center;padding:2px;border:0;background:transparent;font:600 17px inherit"></b><span>minimo</span></div>
+      <div><b><input id="p${i.id}" value="${i.list_price}"></b><span>pubblichi a</span></div>
+      <div><b><input id="f${i.id}" value="${i.floor_price}"></b><span>minimo</span></div>
     </div>
-    ${i.comparables ? `<div class="why">${esc(i.comparables.reasoning)}<br><span class="v">Basato su ${i.comparables.sold} venduti e ${i.comparables.active} annunci attivi.</span></div>
-      <details><summary>Vedi i comparabili</summary>${i.comparables.sample.map((c) => `<div class="v">${c.sold ? '✔ venduto' : '· attivo'} — ${esc(c.title)} · ${eur(c.price)}</div>`).join('')}</details>` : ''}
-    <div class="row" style="margin-top:12px">
+    ${i.comparables?`<div class="why">${esc(i.comparables.reasoning)}<br>
+      <span class="v">Da ${i.comparables.sold} venduti e ${i.comparables.active} annunci attivi.</span></div>
+      <details><summary>Vedi i comparabili</summary>${i.comparables.sample.map(c=>
+        `<div class="v" style="padding:3px 0">${c.sold?'✔':'·'} ${esc(c.title)} — ${eur(c.price)}</div>`).join('')}</details>`:''}
+    <div class="row" style="margin-top:16px">
       <button style="flex:1" onclick="approve(${i.id})">Pubblica su Vinted</button>
       <button class="sec" onclick="act(${i.id},'reject')">Scarta</button>
-    </div>
-  </div>`;
+    </div></div>`;
 }
 
-window.act = async (id, what) => { await api(`/items/${id}/${what}`, { method: 'POST' }); refresh(); };
+window.act = async (id, w) => { await api(`/items/${id}/${w}`, { method:'POST' }); refresh(); };
 
 window.approve = async (id) => {
   const g = (p) => $('#' + p + id).value.trim();
-  const btn = event.target; btn.disabled = true; btn.textContent = 'Pubblico…';
-  const r = await api(`/items/${id}/approve`, {
-    method: 'POST',
-    body: JSON.stringify({
-      title: g('t'), description: g('d'), brand: g('b'), size: g('s'),
-      list_price: Number(g('p')), floor_price: Number(g('f')), brand_confirmed: true,
-    }),
-  });
-  if (r.error) { alert(r.error); btn.disabled = false; btn.textContent = 'Pubblica su Vinted'; return; }
+  const b = event.target; b.disabled = true; b.textContent = 'Pubblico…';
+  const r = await api(`/items/${id}/approve`, { method:'POST', body: JSON.stringify({
+    title:g('t'), description:g('d'), brand:g('b'), size:g('s'),
+    list_price:Number(g('p')), floor_price:Number(g('f')), brand_confirmed:true }) });
+  if (r.error) { alert(r.error); b.disabled = false; b.textContent = 'Pubblica su Vinted'; return; }
   refresh();
 };
 
@@ -188,14 +237,19 @@ $('#file').onchange = async (e) => {
   const fd = new FormData();
   for (const f of e.target.files) fd.append('photos', f);
   $('#add').disabled = true; $('#add').textContent = 'Carico…';
-  await fetch('/api/items', { method: 'POST', body: fd });
-  $('#file').value = ''; $('#add').disabled = false; $('#add').textContent = '+ Aggiungi foto di un articolo';
+  await fetch('/api/items', { method:'POST', body:fd });
+  $('#file').value = ''; $('#add').disabled = false; $('#add').textContent = 'Aggiungi le foto di un capo';
   refresh();
+  await api('/drain', { method:'POST' }).then(refresh);   // work happens while the app is open
 };
 
-navigator.serviceWorker?.register('/sw.js').catch(() => {});
+navigator.serviceWorker?.register('/sw.js').catch(()=>{});
 refresh();
-setInterval(() => { if (items.some((i) => i.status === 'analyzing')) refresh(); }, 5000);
+setInterval(async () => {
+  if (!items.some(i => ['analyzing','queued'].includes(i.status))) return;
+  await refresh();
+  if (items.some(i => i.status === 'queued')) await api('/drain', { method:'POST' }).then(refresh);
+}, 6000);
 </script>
 </body>
 </html>

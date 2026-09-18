@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS items (
   vinted_id     TEXT,
   views         INTEGER DEFAULT 0,
   favourites    INTEGER DEFAULT 0,
+  started_at    TEXT,
   last_drop_at  TEXT,
   posted_at     TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))

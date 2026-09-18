@@ -101,6 +101,13 @@ node test.mjs
 Covers the price decay (never below floor, never stalls, never inverts) and the
 brand rule (an AI-inferred brand can never auto-post without your confirmation).
 
+## When Gemini breaks
+
+Google retires model ids without warning, and aliases can point at overloaded
+models. `GET /api/models?k=...` lists what your key can use; add `&test=1` to
+time the candidates. Set the healthy one as `GEMINI_MODEL` in `wrangler.jsonc`.
+The code already falls back to a lite model when the primary is overloaded.
+
 ## Known limits
 
 - **Free plan gives ~10 browser-minutes/day.** Each analysis and each daily price

@@ -28,6 +28,7 @@
   "vars": {
     "VINTED_HOST": "www.vinted.it",
     "LOCALE": "it",
+    "GEMINI_MODEL": "gemini-3.5-flash",
     "CURRENCY": "EUR",
     "BUMP_PCT": 50,
     "DROP_PCT": 5,

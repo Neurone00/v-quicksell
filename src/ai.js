@@ -2,17 +2,18 @@
 // ponytail: one model for vision + text + pricing. Workers AI vision was the
 // alternative but is worse at small care-label text and burns the free neurons.
 
-const MODEL = 'gemini-3.6-flash';
+// Measured, not guessed: gemini-flash-latest and 3.8-flash were returning 503
+// or hanging; 3.5-flash answers in ~1.5s. The lite model is the fallback for
+// when the primary is overloaded — which is a thing that actually happens.
+const MODELS = (env) => [env.GEMINI_MODEL || 'gemini-3.5-flash', 'gemini-flash-lite-latest'];
+const OVERLOADED = (s) => s === 503 || s === 429 || s === 500;
 
-async function gemini(env, parts, schemaHint, attempt = 0) {
+async function callModel(env, model, parts, schemaHint) {
   const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-goog-api-key': env.GEMINI_API_KEY,
-      },
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
       body: JSON.stringify({
         contents: [{ role: 'user', parts }],
         generationConfig: {
@@ -21,23 +22,36 @@ async function gemini(env, parts, schemaHint, attempt = 0) {
           responseSchema: schemaHint,
         },
       }),
+      // Without this, one stalled call hung the whole analysis indefinitely.
+      signal: AbortSignal.timeout(45000),
     }
   );
-
-  // 503/429 are routine on the free tier. Retrying beats parking a real item
-  // in an error state that needs a manual tap to clear.
-  // ponytail: short backoff on purpose. This runs inside waitUntil, and a long
-  // sleep there gets the whole background task evicted — which strands the item.
-  if ((r.status === 503 || r.status === 429) && attempt < 3) {
-    await new Promise((f) => setTimeout(f, 1200 * 2 ** attempt));
-    return gemini(env, parts, schemaHint, attempt + 1);
+  if (!r.ok) {
+    const e = new Error(`gemini ${model} ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    e.status = r.status;
+    throw e;
   }
-  if (!r.ok) throw new Error(`gemini ${r.status}: ${await r.text()}`);
-
   const j = await r.json();
   const text = j.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('gemini returned no content: ' + JSON.stringify(j).slice(0, 300));
+  if (!text) throw new Error('gemini returned no content: ' + JSON.stringify(j).slice(0, 200));
   return JSON.parse(text);
+}
+
+async function gemini(env, parts, schemaHint) {
+  let last;
+  for (const model of MODELS(env)) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await callModel(env, model, parts, schemaHint);
+      } catch (e) {
+        last = e;
+        // A hard error (bad key, bad request) will not fix itself — fail fast.
+        if (e.status && !OVERLOADED(e.status)) throw e;
+        if (attempt < 2) await new Promise((f) => setTimeout(f, 800 * 2 ** attempt));
+      }
+    }
+  }
+  throw last;
 }
 
 const ANALYSIS_SCHEMA = {

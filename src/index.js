@@ -91,6 +91,36 @@ async function route(p, req, env, ctx) {
 
   if (p === '/api/probe') return json(await V.probe(env));
 
+  // Escape hatch for when Google retires a model again: lists what this key can
+  // use, and with ?test=1 times each candidate so you can see which are healthy.
+  if (p === '/api/models') {
+    if (url.searchParams.get('test')) {
+      const out = [];
+      for (const m of ['gemini-3.5-flash', 'gemini-flash-lite-latest', 'gemini-flash-latest']) {
+        const t0 = Date.now();
+        try {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+            body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ok' }] }] }),
+            signal: AbortSignal.timeout(12000),
+          });
+          out.push({ model: m, status: r.status, ms: Date.now() - t0 });
+        } catch (e) { out.push({ model: m, error: String(e.message).slice(0, 60), ms: Date.now() - t0 }); }
+      }
+      return json(out);
+    }
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', {
+      headers: { 'x-goog-api-key': env.GEMINI_API_KEY },
+    });
+    const j = await r.json();
+    return json(
+      (j.models || [])
+        .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+        .map((m) => m.name.replace('models/', ''))
+    );
+  }
+
   // The open app drains its own queue. A normal request has a real time budget;
   // waitUntil-after-response does not, and the cron is best-effort.
   if (p === '/api/drain' && req.method === 'POST') {

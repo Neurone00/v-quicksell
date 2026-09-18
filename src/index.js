@@ -3,6 +3,11 @@ import { analysePhotos, priceFromComparables } from './ai.js';
 import { notify } from './push.js';
 import { round50, listPrice, nextPrice } from './price.js';
 
+// ponytail: photos live in KV, not R2. R2 needs a card on file just to enable;
+// KV is already bound, free, and 1GB holds far more than this app will ever
+// store. Move to R2 if this ever becomes a real photo library.
+const PHOTO = 'photo:';
+
 const json = (o, status = 200) =>
   new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
 
@@ -44,9 +49,9 @@ export default {
       const key = decodeURIComponent(p.slice('/api/photo/'.length));
       const ok = authed(req, env) || url.searchParams.get('t') === (await photoToken(env, key));
       if (!ok) return new Response('no', { status: 403 });
-      const obj = await env.R2.get(key);
-      if (!obj) return new Response('not found', { status: 404 });
-      return new Response(obj.body, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=3600' } });
+      const buf = await env.KV.get(PHOTO + key, 'arrayBuffer');
+      if (!buf) return new Response('not found', { status: 404 });
+      return new Response(buf, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=3600' } });
     }
 
     if (p === '/api/version') return json({ version: env.APP_VERSION });
@@ -162,7 +167,7 @@ async function route(p, req, env, ctx) {
     const keys = [];
     for (const [i, f] of files.entries()) {
       const key = `${Date.now()}-${i}.jpg`;
-      await env.R2.put(key, await processPhoto(env, f));
+      await env.KV.put(PHOTO + key, await processPhoto(env, f));
       keys.push(key);
     }
     const r = await db
@@ -214,16 +219,17 @@ async function drainQueue(env) {
 // Photo post-production. Basic pass, via the Images binding.
 // ---------------------------------------------------------------------------
 async function processPhoto(env, file) {
-  if (!env.IMAGES) return file.stream();
+  const buf = (b) => new Response(b).arrayBuffer(); // KV wants bytes, not a stream
+  if (!env.IMAGES) return buf(file.stream());
   try {
     const out = await env.IMAGES.input(file.stream())
       .transform({ width: 1200, height: 1200, fit: 'contain', background: '#ffffff' })
       .transform({ sharpen: 1 })
       .output({ format: 'image/jpeg', quality: 88 });
-    return out.image();
+    return buf(out.image());
   } catch {
-    // ponytail: Images has a free-tier cap. Raw photo beats a failed upload.
-    return file.stream();
+    // Images has a free-tier cap. A raw photo beats a failed upload.
+    return buf(file.stream());
   }
 }
 
@@ -241,8 +247,8 @@ async function analyse(env, id) {
 
     const b64 = [];
     for (const k of keys.slice(0, 4)) {
-      const o = await env.R2.get(k);
-      b64.push(bufToB64(await o.arrayBuffer()));
+      const buf = await env.KV.get(PHOTO + k, 'arrayBuffer');
+      if (buf) b64.push(bufToB64(buf));
     }
 
     const a = await analysePhotos(env, b64);

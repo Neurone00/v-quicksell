@@ -128,9 +128,22 @@ const LABEL = { queued:'In coda', analyzing:'Analisi', needs_input:'Serve confer
 
 async function refresh() {
   const [st, d] = await Promise.all([api('/status'), api('/items')]);
+  // A 401 used to fall through and render as "nothing is configured", which
+  // looks identical to a broken install. Say what actually happened.
+  if (st.error === 'unauthorized') return locked();
   CFG = st; $('#ver').textContent = 'v' + st.version;
   renderSetup(st); apkBanner(st);
   items = d.items || []; render();
+}
+
+function locked() {
+  $('#ver').textContent = '';
+  $('#list').innerHTML = '';
+  $('#add').style.display = 'none';
+  $('#setup').innerHTML = `<div class="card setup"><h2>Accesso richiesto</h2>
+    <p style="margin-top:6px">Apri l'app aggiungendo la tua chiave all'indirizzo:<br>
+    <code style="color:var(--calypso)">…workers.dev/?k=LA_TUA_CHIAVE</code></p>
+    <p>Basta una volta per dispositivo: dopo resta salvata in un cookie.</p></div>`;
 }
 
 function renderSetup(st) {

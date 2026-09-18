@@ -12,13 +12,10 @@
   "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/"] },
 
   "d1_databases": [
-    { "binding": "DB", "database_name": "quicksell", "database_id": "ba02d758-9b16-4428-820c-f8c6370cd62a" }
+    { "binding": "DB", "database_name": "quicksell", "database_id": "83fdb7a2-3905-4c18-9fb1-185e4d9a7ff8" }
   ],
   "kv_namespaces": [
-    { "binding": "KV", "id": "9862cd81e327490882bda2d5fdc773ef" }
-  ],
-  "r2_buckets": [
-    { "binding": "R2", "bucket_name": "quicksell-photos" }
+    { "binding": "KV", "id": "205eb9712486470fb7d69dfb17adb7d1" }
   ],
   "browser": { "binding": "BROWSER" },
   "images": { "binding": "IMAGES" },
@@ -35,7 +32,7 @@
     "DROP_EVERY_DAYS": 3,
     "APP_VERSION": "1.0.0",
     "APK_VERSION": "1.0.0",
-    "PUBLIC_URL": "https://v-quicksell.l-salvioni.workers.dev",
+    "PUBLIC_URL": "https://v-quicksell.neurone00.workers.dev",
     "VAPID_PUBLIC": "BEJJOG4gqZcBfQ774L-lycB5q-dP63GY0zLQljQi62g4ktg840ASHTqW22yJxESMRO7sIVFkvHNee6zlPQpVtqI"
   }
 }

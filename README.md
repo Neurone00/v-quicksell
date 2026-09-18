@@ -23,7 +23,6 @@ Runs on Cloudflare Workers. Web + installable PWA + sideloadable Android APK.
 npm install
 npx wrangler d1 create quicksell          # -> copy database_id into wrangler.jsonc
 npx wrangler kv namespace create KV        # -> copy id into wrangler.jsonc
-npx wrangler r2 bucket create quicksell-photos
 npm run db:init
 ```
 

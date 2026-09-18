@@ -104,8 +104,27 @@ async function loggedIn(page) {
   });
 }
 
+// Free plan: ~3 concurrent browsers and ~10 minutes a day. Launching a fresh
+// one per attempt while leaving the old alive on keep_alive burns the quota in
+// a handful of tries, which is exactly what happened. Reuse an idle session.
 export async function browserStart(env) {
-  const browser = await puppeteer.launch(env.BROWSER, { keep_alive: 300000 });
+  let browser = null;
+  for (const sess of await puppeteer.sessions(env.BROWSER).catch(() => [])) {
+    if (sess.connectionId) continue;                 // in use by another request
+    browser = await puppeteer.connect(env.BROWSER, sess.sessionId).catch(() => null);
+    if (browser) break;
+  }
+  if (!browser) {
+    try {
+      browser = await puppeteer.launch(env.BROWSER, { keep_alive: 180000 });
+    } catch (e) {
+      if (/429|rate limit/i.test(String(e.message))) {
+        const lim = await puppeteer.limits(env.BROWSER).catch(() => null);
+        throw new Error(`BROWSER_LIMIT:${lim?.timeUntilNextAllowedBrowserAcquisition ?? 0}`);
+      }
+      throw e;
+    }
+  }
   const sessionId = browser.sessionId();
   const page = (await browser.pages())[0] || (await browser.newPage());
   await page.setViewport({ width: 400, height: 760, deviceScaleFactor: 1 });
@@ -156,6 +175,25 @@ export async function browserStop(env, sessionId) {
   const browser = await puppeteer.connect(env.BROWSER, sessionId).catch(() => null);
   if (browser) await browser.close().catch(() => {});
   return { ok: true };
+}
+
+// Diagnostics and recovery: see what is holding the quota, and hand it back.
+export async function browserStatus(env) {
+  const [sessions, limits] = await Promise.all([
+    puppeteer.sessions(env.BROWSER).catch((e) => ({ error: String(e.message).slice(0, 120) })),
+    puppeteer.limits(env.BROWSER).catch((e) => ({ error: String(e.message).slice(0, 120) })),
+  ]);
+  return { sessions, limits };
+}
+
+export async function browserReap(env) {
+  let closed = 0;
+  for (const sess of await puppeteer.sessions(env.BROWSER).catch(() => [])) {
+    if (sess.connectionId) continue;
+    const b = await puppeteer.connect(env.BROWSER, sess.sessionId).catch(() => null);
+    if (b) { await b.close().catch(() => {}); closed++; }
+  }
+  return { closed };
 }
 
 export async function hasSession(env) {
@@ -251,50 +289,71 @@ function makeApi(page, env) {
 // Operations
 // ---------------------------------------------------------------------------
 
-// Comparable listings for pricing.
+// Comparables without a browser at all.
 //
-// VERIFIED 2026-09-18 against the live site: /api/v2/catalog/items answers 403
-// anonymously (and 404 under some bot-detection states — Vinted hides protected
-// routes that way). So the JSON API exists but needs a logged-in session, while
-// this scrape works with no session at all and no API rate limit. Once a real
-// session is connected, compare the two and keep whichever is steadier.
-// The catalog page is server-rendered and
-// every item link carries its data in the title attribute:
-//   "Felpa nike, Brand: Nike, Condizioni: Ottime, Taglia: M, 38.00 €, 40.60 €"
-// So we read the rendered page. Labels are Italian because this app is fixed
-// to vinted.it; a different market needs its own labels.
-export async function searchComparables(api, query, page) {
-  await page.goto(`https://${page._vqHost}/catalog?search_text=${encodeURIComponent(query)}`, {
-    waitUntil: 'domcontentloaded',
-    timeout: 45000,
-  });
-  await page.waitForSelector('a[href*="/items/"]', { timeout: 20000 }).catch(() => {});
+// The catalog page answers a plain fetch with 200 and renders every item's data
+// into a title attribute. Browser Rendering is the scarce resource here — the
+// Free plan allows ~10 minutes a DAY — so spending two seconds of it per
+// analysis was the wrong trade. This costs none.
+//
+// The page is ~7MB and Free Workers get 10ms of CPU, so we stream it and stop
+// as soon as we have enough, instead of buffering and scanning the lot.
+const UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+const TITLE_RE = /title="([^"]*Brand:[^"]*)"/g;
 
-  return page.evaluate(() => {
-    const out = [];
-    for (const a of document.querySelectorAll('a[href*="/items/"]')) {
-      const t = a.getAttribute('title') || '';
-      if (!t) continue;
-      // Two prices are shown: the seller's ask, then the same plus buyer
-      // protection. We want the ask — the second would inflate every estimate.
-      const prices = [...t.matchAll(/(\d+[.,]\d{2})\s*€/g)].map((m) => parseFloat(m[1].replace(',', '.')));
-      if (!prices.length) continue;
-      out.push({
-        title: t.split(/,\s*(?:Brand|Condizioni|Taglia):/)[0].trim(),
-        brand: (/,\s*Brand:\s*([^,]+)/.exec(t) || [])[1]?.trim() || null,
-        condition: (/,\s*Condizioni:\s*([^,]+)/.exec(t) || [])[1]?.trim() || null,
-        size: (/,\s*Taglia:\s*([^,]+)/.exec(t) || [])[1]?.trim() || null,
-        price: prices[0],
-        // Search excludes sold items, so these are all active asks. The pricing
-        // prompt is told to treat active listings as an upper bound.
-        sold: false,
-        url: a.getAttribute('href'),
-      });
+function parseTitle(t) {
+  const txt = t.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  // Two prices are shown: the ask, then the ask plus buyer protection. The
+  // second would inflate every estimate, so take the first.
+  const prices = [...txt.matchAll(/(\d+[.,]\d{2})\s*€/g)].map((m) => parseFloat(m[1].replace(',', '.')));
+  if (!prices.length) return null;
+  return {
+    title: txt.split(/,\s*(?:Brand|Condizioni|Taglia):/)[0].trim(),
+    brand: (/,\s*Brand:\s*([^,]+)/.exec(txt) || [])[1]?.trim() || null,
+    condition: (/,\s*Condizioni:\s*([^,]+)/.exec(txt) || [])[1]?.trim() || null,
+    size: (/,\s*Taglia:\s*([^,]+)/.exec(txt) || [])[1]?.trim() || null,
+    price: prices[0],
+    sold: false,   // search excludes sold items; all of these are active asks
+  };
+}
+
+export async function searchComparables(env, query, want = 60) {
+  const r = await fetch(
+    `https://${env.VINTED_HOST}/catalog?search_text=${encodeURIComponent(query)}`,
+    {
+      headers: {
+        'user-agent': UA,
+        accept: 'text/html,application/xhtml+xml',
+        'accept-language': 'it-IT,it;q=0.9',
+      },
+      signal: AbortSignal.timeout(25000),
     }
-    // De-duplicate: each card exposes more than one link to the same item.
-    const seen = new Set();
-    return out.filter((c) => !seen.has(c.url) && seen.add(c.url));
-  });
+  );
+  if (!r.ok) throw new Error(`catalog ${r.status}`);
+
+  const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
+  const out = [];
+  const seen = new Set();
+  let tail = '';
+  try {
+    while (out.length < want) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const chunk = tail + value;
+      TITLE_RE.lastIndex = 0;
+      let m;
+      while ((m = TITLE_RE.exec(chunk))) {
+        const c = parseTitle(m[1]);
+        if (c && !seen.has(m[1])) { seen.add(m[1]); out.push(c); }
+      }
+      // keep a small overlap so a title split across chunks still matches
+      tail = chunk.slice(-2000);
+    }
+  } finally {
+    await reader.cancel().catch(() => {});   // stop the download early
+  }
+  return out;
 }
 
 // ponytail: returns null for now. The endpoint it used is gone, and the

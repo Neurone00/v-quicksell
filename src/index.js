@@ -97,8 +97,19 @@ async function route(p, req, env, ctx) {
   // Relayed login: the Worker drives a real browser, the phone sees screenshots
   // and sends back taps. The user signs in however they normally do.
   if (p === '/api/session/browser/start' && req.method === 'POST') {
-    return json(await V.browserStart(env));
+    try {
+      return json(await V.browserStart(env));
+    } catch (e) {
+      const m = /^BROWSER_LIMIT:(\d+)/.exec(String(e.message));
+      if (m) {
+        const mins = Math.ceil(Number(m[1]) / 60) || 1;
+        return json({ error: `Limite browser di Cloudflare raggiunto. Riprova tra circa ${mins} min, oppure tocca "Libera sessioni".` }, 429);
+      }
+      return json({ error: String(e.message).slice(0, 180) }, 500);
+    }
   }
+  if (p === '/api/browser/status') return json(await V.browserStatus(env));
+  if (p === '/api/browser/reap' && req.method === 'POST') return json(await V.browserReap(env));
   if (p === '/api/session/browser/act' && req.method === 'POST') {
     const { sessionId, act } = await req.json();
     if (!sessionId || !act) return json({ error: 'sessione mancante' }, 400);
@@ -305,10 +316,8 @@ async function analyse(env, id) {
     let comparables = [];
     let category = null;
     try {
-      ({ comparables, category } = await V.withVinted(env, async (api, page) => ({
-        comparables: await V.searchComparables(api, a.search_query, page),
-        category: await V.findCategory(),
-      })));
+      // No browser: this is a plain fetch, and browser minutes are precious.
+      comparables = await V.searchComparables(env, a.search_query);
     } catch (e) {
       // No session just means no market data. The vision work already succeeded —
       // throwing it away would waste it and leave you with nothing to look at.

@@ -144,6 +144,8 @@ async function route(p, req, env, ctx) {
     return json({ total: log.length, endpoints: byPath, recent: log.slice(-40) });
   }
 
+  if (p === '/api/reach') return json(await V.reachability(env));
+
   if (p === '/api/probe') return json(await V.probe(env));
 
   // Escape hatch for when Google retires a model again: lists what this key can
@@ -367,12 +369,12 @@ async function approve(env, item, edits) {
   }
   if (!merged.size) return { error: 'Manca la taglia.' };
 
-  const tokens = await Promise.all(JSON.parse(item.photos).map((k) => photoToken(env, k)));
-  const urls = JSON.parse(item.photos).map(
-    (k, i) => `${env.PUBLIC_URL}/api/photo/${encodeURIComponent(k)}?t=${tokens[i]}`
-  );
-
-  const vintedId = await V.withVinted(env, (api, page) => V.createListing(api, page, merged, urls));
+  const photos = [];
+  for (const k of JSON.parse(item.photos)) {
+    const buf = await env.KV.get(PHOTO + k, 'arrayBuffer');
+    if (buf) photos.push(buf);
+  }
+  const vintedId = await V.createListing(env, merged, photos);
 
   await db
     .prepare(
@@ -403,10 +405,9 @@ async function priceRound(env) {
     .all();
   if (!results.length) return;
 
-  await V.withVinted(env, async (api) => {
-    for (const it of results) {
+  for (const it of results) {
       try {
-        const stats = await V.fetchStats(api, it.vinted_id);
+        const stats = await V.fetchStats(env, it.vinted_id);
         if (stats.sold) {
           await db.prepare("UPDATE items SET status='sold', current_price=? WHERE id=?")
             .bind(stats.price, it.id).run();
@@ -419,7 +420,7 @@ async function priceRound(env) {
             .bind(stats.views, stats.favourites, it.id).run();
           continue;
         }
-        await V.updatePrice(api, it.vinted_id, next);
+        await V.updatePrice(env, it.vinted_id, next);
         await db
           .prepare("UPDATE items SET current_price=?, views=?, favourites=?, last_drop_at=datetime('now') WHERE id=?")
           .bind(next, stats.views, stats.favourites, it.id)
@@ -427,8 +428,7 @@ async function priceRound(env) {
       } catch (e) {
         await db.prepare('UPDATE items SET note=? WHERE id=?').bind(String(e.message).slice(0, 200), it.id).run();
       }
-    }
-  });
+  }
 }
 
 function bufToB64(buf) {

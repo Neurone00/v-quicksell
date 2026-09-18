@@ -218,71 +218,90 @@ function parseCookieString(s, host) {
 // gets ONE browser and does all its work inside a single open().
 // ---------------------------------------------------------------------------
 
-export async function withVinted(env, fn) {
-  const cookies = JSON.parse((await env.KV.get(SESSION_KEY)) || 'null');
-  if (!cookies) throw new Error('NO_SESSION');
+// ---------------------------------------------------------------------------
+// The API, over plain fetch, using the cookies the login captured.
+//
+// The browser is for LOGGING IN. Once we hold a session, Vinted is reachable
+// from the Worker directly — the catalog page already proved a Worker IP is not
+// blocked — so posting and price updates should cost no browser time either.
+// ---------------------------------------------------------------------------
 
-  const browser = await puppeteer.launch(env.BROWSER);
-  try {
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 900 });
-    await page.setCookie(...cookies);
-    await page.goto(`https://${env.VINTED_HOST}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
-
-    if (await isLoggedOut(page)) {
-      await env.KV.delete(SESSION_KEY);
-      throw new Error('SESSION_EXPIRED');
-    }
-
-    // Persist refreshed cookies (incl. the Datadome token) for next time.
-    await env.KV.put(SESSION_KEY, JSON.stringify(await page.cookies()));
-
-    page._vqHost = env.VINTED_HOST;
-    return await fn(makeApi(page, env), page);
-  } finally {
-    await browser.close();
-  }
+async function cookieHeader(env) {
+  const jar = JSON.parse((await env.KV.get(SESSION_KEY)) || 'null');
+  if (!jar) throw new Error('NO_SESSION');
+  return jar.map((c) => `${c.name}=${c.value}`).join('; ');
 }
 
-async function isLoggedOut(page) {
-  return page.evaluate(() => {
-    const t = document.body?.innerText || '';
-    return /accedi|iscriviti/i.test(t) && !/il mio armadio|vendi ora/i.test(t);
+// Vinted wants a CSRF token on writes. It lives in a meta tag on any page.
+async function csrf(env, cookie) {
+  const cached = await env.KV.get('csrf');
+  if (cached) return cached;
+  const r = await fetch(`https://${env.VINTED_HOST}/`, {
+    headers: { cookie, 'user-agent': UA, accept: 'text/html' },
+    signal: AbortSignal.timeout(20000),
   });
+  const head = (await r.text()).slice(0, 200000);
+  const t = /<meta[^>]+name="csrf-token"[^>]+content="([^"]+)"/.exec(head)?.[1] || '';
+  if (t) await env.KV.put('csrf', t, { expirationTtl: 3600 });
+  return t;
 }
 
-// Calls Vinted's JSON API from inside the page, so it carries the session,
-// the Datadome cookie and a genuine browser fingerprint.
-function makeApi(page, env) {
-  return async function api(path, init = {}) {
-    const res = await page.evaluate(
-      async (path, init) => {
-        const csrf =
-          document.querySelector('meta[name="csrf-token"]')?.content ||
-          document.cookie.match(/(?:^|;\s*)v_sid=([^;]+)/)?.[1] ||
-          '';
-        const r = await fetch(path, {
-          method: init.method || 'GET',
-          credentials: 'include',
-          headers: {
-            accept: 'application/json, text/plain, */*',
-            'x-csrf-token': csrf,
-            ...(init.json ? { 'content-type': 'application/json' } : {}),
-            ...(init.headers || {}),
-          },
-          body: init.json ? JSON.stringify(init.json) : undefined,
-        });
-        const text = await r.text();
-        let body;
-        try { body = JSON.parse(text); } catch { body = text.slice(0, 500); }
-        return { ok: r.ok, status: r.status, body };
-      },
-      path,
-      init
-    );
-    if (!res.ok) throw new Error(`vinted ${init.method || 'GET'} ${path} -> ${res.status}: ${JSON.stringify(res.body).slice(0, 300)}`);
-    return res.body;
+export async function vapi(env, path, init = {}) {
+  const cookie = await cookieHeader(env);
+  const write = init.method && init.method !== 'GET';
+  const r = await fetch(`https://${env.VINTED_HOST}${path}`, {
+    method: init.method || 'GET',
+    headers: {
+      cookie,
+      'user-agent': UA,
+      accept: 'application/json, text/plain, */*',
+      'accept-language': 'it-IT,it;q=0.9',
+      referer: `https://${env.VINTED_HOST}/`,
+      ...(write ? { 'x-csrf-token': await csrf(env, cookie) } : {}),
+      ...(init.json ? { 'content-type': 'application/json' } : {}),
+      ...(init.headers || {}),
+    },
+    body: init.json ? JSON.stringify(init.json) : init.body,
+    signal: AbortSignal.timeout(30000),
+  });
+  const text = await r.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = text.slice(0, 300); }
+  if (!r.ok) {
+    const e = new Error(`vinted ${init.method || 'GET'} ${path} -> ${r.status}`);
+    e.status = r.status; e.body = body;
+    throw e;
+  }
+  return body;
+}
+
+// Is the API reachable from the Worker at all, with and without a session?
+// Answers the question the browser cost hangs on.
+export async function reachability(env) {
+  const probe = async (path, withCookie) => {
+    const t0 = Date.now();
+    try {
+      const headers = { 'user-agent': UA, accept: 'application/json, text/plain, */*',
+        referer: `https://${env.VINTED_HOST}/` };
+      if (withCookie) headers.cookie = await cookieHeader(env).catch(() => '');
+      const r = await fetch(`https://${env.VINTED_HOST}${path}`, {
+        headers, signal: AbortSignal.timeout(20000),
+      });
+      const body = (await r.text()).slice(0, 120);
+      return { path, auth: !!withCookie, status: r.status, ms: Date.now() - t0,
+        challenged: /challenge-platform|cf-mitigated|Just a moment/i.test(body) };
+    } catch (e) {
+      return { path, auth: !!withCookie, error: String(e.message).slice(0, 80), ms: Date.now() - t0 };
+    }
   };
+  const hasSess = await hasSession(env);
+  const paths = ['/api/v2/users/current', '/api/v2/catalog/items?search_text=nike&per_page=3'];
+  const out = [];
+  for (const p of paths) {
+    out.push(await probe(p, false));
+    if (hasSess) out.push(await probe(p, true));
+  }
+  return { session: hasSess, results: out };
 }
 
 // ---------------------------------------------------------------------------
@@ -363,27 +382,20 @@ export async function findCategory() {
   return null;
 }
 
-// Uploads photos then creates the listing. Photos are fetched into the page
-// from our own Worker so the upload comes from the browser, not from a Worker IP.
-export async function createListing(api, page, item, photoUrls) {
+// Uploads photos, then creates the listing — all over plain fetch. No browser:
+// a Worker can POST multipart straight from KV, which is simpler than pulling
+// the images back into a browser page just to upload them again.
+export async function createListing(env, item, photos) {
   const uploaded = [];
-  for (const url of photoUrls) {
-    const id = await page.evaluate(async (url) => {
-      const blob = await (await fetch(url)).blob();
-      const fd = new FormData();
-      fd.append('photo[type]', 'item');
-      fd.append('photo[file]', blob, 'photo.jpg');
-      const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-      const r = await fetch('/api/v2/photos', {
-        method: 'POST', credentials: 'include', headers: { 'x-csrf-token': csrf }, body: fd,
-      });
-      if (!r.ok) throw new Error('photo upload ' + r.status + ' ' + (await r.text()).slice(0, 200));
-      return (await r.json()).id;
-    }, url);
-    uploaded.push(id);
+  for (const [i, buf] of photos.entries()) {
+    const fd = new FormData();
+    fd.append('photo[type]', 'item');
+    fd.append('photo[file]', new Blob([buf], { type: 'image/jpeg' }), `photo${i}.jpg`);
+    const res = await vapi(env, '/api/v2/photos', { method: 'POST', body: fd });
+    uploaded.push(res.id ?? res.photo?.id);
   }
 
-  const created = await api('/api/v2/items', {
+  const created = await vapi(env, '/api/v2/items', {
     method: 'POST',
     json: {
       item: {
@@ -391,7 +403,7 @@ export async function createListing(api, page, item, photoUrls) {
         description: item.description,
         catalog_id: item.category_id,
         price: String(item.list_price),
-        currency: 'EUR',
+        currency: env.CURRENCY,
         brand: item.brand || undefined,
         size_id: item.size_id || undefined,
         status_id: item.status_id || undefined,
@@ -404,14 +416,17 @@ export async function createListing(api, page, item, photoUrls) {
   return String(created.item?.id ?? created.id);
 }
 
-export async function updatePrice(api, vintedId, price) {
-  await api(`/api/v2/items/${vintedId}`, { method: 'PUT', json: { item: { price: String(price) } } });
+export async function updatePrice(env, vintedId, price) {
+  await vapi(env, `/api/v2/items/${vintedId}`, {
+    method: 'PUT',
+    json: { item: { price: String(price) } },
+  });
 }
 
 // Views/favourites/sold status for items we've listed.
 // /api/v2/items/{id} is deprecated — /details is the current one.
-export async function fetchStats(api, vintedId) {
-  const r = await api(`/api/v2/items/${vintedId}/details`);
+export async function fetchStats(env, vintedId) {
+  const r = await vapi(env, `/api/v2/items/${vintedId}/details`);
   const it = r.item || r;
   return {
     views: it.view_count ?? 0,
@@ -423,9 +438,9 @@ export async function fetchStats(api, vintedId) {
 
 // Setup helper: confirms the session works and the API shapes above still match.
 export async function probe(env) {
-  return withVinted(env, async (api, page) => {
-    const me = await api('/api/v2/users/current').catch((e) => ({ error: String(e.message).slice(0, 120) }));
-    const comps = await searchComparables(api, 'nike felpa', page);
+  return (async () => {
+    const me = await vapi(env, '/api/v2/users/current').catch((e) => ({ error: String(e.message).slice(0, 120) }));
+    const comps = await searchComparables(env, 'nike felpa', 10);
     return {
       user: me.user?.login || me.login || me.error || '(sconosciuto)',
       comparables_found: comps.length,
@@ -434,5 +449,5 @@ export async function probe(env) {
       // treat createListing/updatePrice as unverified.
       posting_verified: false,
     };
-  });
+  })();
 }

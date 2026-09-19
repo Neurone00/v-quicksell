@@ -137,6 +137,10 @@ details[open] summary:before{content:'▾ '}
 #relay{position:fixed;inset:0;z-index:200;background:var(--ink);display:flex;flex-direction:column;
   padding:calc(10px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom))}
 #relay[hidden]{display:none}
+.rhelp{color:rgba(255,255,255,.72);font-size:12px;margin:4px 6px 8px;line-height:1.45;flex:none}
+.tapdot{position:fixed;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;
+  border:2px solid var(--calypso);pointer-events:none;z-index:300;animation:tap .45s ease-out forwards}
+@keyframes tap{from{transform:scale(.3);opacity:.9}to{transform:scale(1.5);opacity:0}}
 .rbar{display:flex;gap:8px;align-items:center;padding:8px 2px;flex:none}
 .rbar input{flex:1;background:rgba(255,255,255,.1);color:#fff;border:0;padding:10px 12px;border-radius:10px}
 .rbar button{padding:10px 14px;font-size:14px}
@@ -176,18 +180,21 @@ code{font:500 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
 <button class="gear sec" id="gear" title="Impostazioni" aria-label="Impostazioni">⚙</button></header>
 <main><div id="setup"></div><div id="list"></div></main>
 <div id="relay" hidden>
-  <div class="rbar">
-    <button class="sec" onclick="relayAct({type:'back'})" aria-label="Indietro">←</button>
-    <input id="rtext" placeholder="Scrivi (email, password…)" autocomplete="off">
-    <button onclick="relayType()">Invia</button>
-  </div>
+  <p class="rhelp">Questa è la pagina vera di Vinted, aperta dall\u2019app. Tocca dove vuoi:
+    i tocchi arrivano al browser. Per scrivere, tocca prima il campo sulla pagina.</p>
   <div class="rview"><img id="rimg" onclick="relayClick(event)" alt="Vinted"></div>
   <div class="rbar">
+    <button class="sec" onclick="relayAct({type:'back'})" aria-label="Indietro">←</button>
     <button class="sec" onclick="relayAct({type:'scroll',dy:-450})" aria-label="Su">↑</button>
     <button class="sec" onclick="relayAct({type:'scroll',dy:450})" aria-label="Giù">↓</button>
-    <button class="sec" onclick="relayAct({type:'key',key:'Enter'})">Invio</button>
     <span id="rstatus"></span>
     <button class="sec" onclick="relayStop()">Chiudi</button>
+  </div>
+  <div class="rbar">
+    <input id="rtext" placeholder="Scrivi nel campo che hai toccato" autocomplete="off"
+      enterkeyhint="send" onkeydown="if(event.key===\'Enter\')relayType()">
+    <button onclick="relayType()">Scrivi</button>
+    <button class="sec" onclick="relayAct({type:\'key\',key:\'Enter\'})">Invio</button>
   </div>
 </div>
 <input type="file" id="file" accept="image/*" multiple hidden>
@@ -422,6 +429,7 @@ window.relayAct = async (act) => {
 };
 
 window.relayClick = (e) => {
+  relayClickFeedback(e);
   const img = $('#rimg'), rect = img.getBoundingClientRect();
   const scale = Number(img.dataset.w) / rect.width;   // screenshot px per CSS px
   relayAct({ type: 'click', x: Math.round((e.clientX - rect.left) * scale),
@@ -432,6 +440,13 @@ window.relayType = () => {
   const el = $('#rtext'); if (!el.value) return;
   const text = el.value; el.value = '';
   relayAct({ type: 'text', text });
+};
+
+// A tap should feel like it landed even while the round trip is in flight.
+window.relayClickFeedback = (e) => {
+  const d = document.createElement('i'); d.className = 'tapdot';
+  d.style.left = e.clientX + 'px'; d.style.top = e.clientY + 'px';
+  document.body.appendChild(d); setTimeout(() => d.remove(), 450);
 };
 
 window.relayStop = async () => {

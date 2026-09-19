@@ -93,6 +93,21 @@ async function snap(page) {
 // mobile, and Vinted hands anonymous visitors a _vinted_fr_session cookie too —
 // so "has a session cookie" is not "is logged in". /api/v2/users/current
 // answers 200 authenticated and 403 anonymous, which is the real signal.
+// Decline non-essential cookies on the user's behalf. Otherwise the consent
+// wall is the first thing they have to fight through by hand, and re-navigating
+// brings it straight back — which is what produced the "cookie loop".
+async function dismissConsent(page) {
+  const clicked = await page.evaluate(() => {
+    const reject = /accetta solo necessari|solo necessari|rifiuta tutt|reject all/i;
+    const b = [...document.querySelectorAll('button,a')]
+      .find((e) => reject.test((e.textContent || '').trim()));
+    if (b) { b.click(); return true; }
+    return false;
+  }).catch(() => false);
+  if (clicked) await new Promise((r) => setTimeout(r, 900));
+  return clicked;
+}
+
 async function loggedIn(page) {
   return page.evaluate(async () => {
     try {
@@ -126,10 +141,22 @@ export async function browserStart(env) {
     }
   }
   const sessionId = browser.sessionId();
-  const page = (await browser.pages())[0] || (await browser.newPage());
+  const page = (await livePage(browser)) || (await browser.newPage());
   await page.setViewport({ width: 400, height: 760, deviceScaleFactor: 1 });
-  await page.evaluateOnNewDocument(SNIFFER);
-  await page.goto(`https://${env.VINTED_HOST}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await page.evaluateOnNewDocument(SNIFFER).catch(() => {});
+
+  // Land on the sign-in screen, not the homepage — there is nothing to do on
+  // the homepage but hunt for the login button. ref_url sends Vinted to the
+  // new-listing page afterwards, which is also where we want the session proved.
+  //
+  // Always navigate here: "Collega" means start the sign-in, and a reused
+  // session would otherwise strand the user wherever it was left. The cookie
+  // loop this once caused is gone now that consent is declined automatically
+  // rather than re-asked on every load.
+  await page.goto(`https://${env.VINTED_HOST}${env.LOGIN_PATH}`,
+    { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await dismissConsent(page);
+
   const out = { sessionId, ...(await snap(page)) };
   await browser.disconnect();   // disconnect, not close — the session stays warm
   return out;
@@ -150,6 +177,7 @@ export async function browserAct(env, sessionId, act) {
 
     // Give the page a beat to react; clicks may navigate.
     await new Promise((r) => setTimeout(r, act.type === 'click' || act.type === 'key' ? 1600 : 500));
+    await dismissConsent(page);   // it can reappear after a navigation
 
     if (await loggedIn(page)) {
       const cookies = await page.cookies();

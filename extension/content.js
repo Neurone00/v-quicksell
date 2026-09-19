@@ -140,19 +140,29 @@ const sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
 // Vinted options are <div role="checkbox|radio"> (or role=option) carrying an
 // exact aria-label ("L", "Ottime", "Cotone"…). Prefer those; the aria-label is
 // the clean value to match and harvest.
-const optLabel = (o) => (o.getAttribute && o.getAttribute('aria-label')) || o.textContent.trim();
+// Value of an option: aria-label (size/color grids) or the Cell title
+// (condition: aria-label is null, title holds "Ottime"/"Nuovo con cartellino").
+const optLabel = (o) => (o.getAttribute && o.getAttribute('aria-label'))
+  || (o.querySelector && (o.querySelector('[class*="Cell__title"], [data-testid$="--title"]')?.textContent || '').trim())
+  || o.textContent.trim();
 function optionEls(scope) {
   let els = [...scope.querySelectorAll('[role="option"], [role="checkbox"], [role="radio"]')];
   if (!els.length) els = [...scope.querySelectorAll('li, label, button, [data-testid*="option"], [class*="option"]')];
   return els.filter((o) => o.offsetParent !== null && optLabel(o) && optLabel(o).length < 60);
 }
-// Click the interactive option element itself with a real pointer sequence —
-// React's web_ui checkbox/radio ignores a bare div click otherwise.
+const seq = (t) => { for (const ev of ['pointerover', 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) t.dispatchEvent(new MouseEvent(ev, { bubbles: true, cancelable: true, view: window })); };
+// Click the interactive option (role=checkbox/radio div). For radios also nudge
+// the inner label + keyboard — safe because a radio never un-selects; checkboxes
+// get only the single click (a second toggle would UNcheck them).
 function selectOption(o) {
-  const t = o.matches('[role="checkbox"], [role="radio"], [role="option"]') ? o
-    : (o.querySelector('[role="checkbox"], [role="radio"], [role="option"], input, label') || o);
-  for (const ev of ['pointerover', 'pointerenter', 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
-    t.dispatchEvent(new MouseEvent(ev, { bubbles: true, cancelable: true, view: window }));
+  const el = (o.matches && o.matches('[role="checkbox"], [role="radio"], [role="option"]')) ? o
+    : (o.querySelector('[role="checkbox"], [role="radio"], [role="option"]') || o);
+  el.focus && el.focus();
+  seq(el);
+  if (el.getAttribute && el.getAttribute('role') === 'radio') {
+    const lbl = el.querySelector('label'); if (lbl) seq(lbl);
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
   }
 }
 const menuSel = '[role="listbox"], [role="dialog"], [role="menu"], [class*="dropdown"], [class*="menu"], [class*="popover"], ul';
@@ -166,7 +176,14 @@ async function waitMenu(before) {
   }
   return null;
 }
-const closeMenu = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+// Collapse the flyout so the next field's menu doesn't stack on top: Escape,
+// plus an outside pointer/click that Vinted's outside-click handler catches.
+function closeMenu() {
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  for (const ev of ['pointerdown', 'mousedown', 'mouseup', 'click']) {
+    document.body.dispatchEvent(new MouseEvent(ev, { bubbles: true, cancelable: true, view: window }));
+  }
+}
 function matchOpt(text, want, mode) {
   const w = norm(want);
   if (mode === 'token') return text.split(/[^a-z0-9]+/).includes(w);           // "L" ≠ "XL"

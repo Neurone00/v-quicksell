@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.13
+
+**1.4.13** — condizioni ora si seleziona (era un radio col titolo dentro una Cell, non un aria-label), e i menu si chiudono da soli invece di accavallarsi. Taglia, colore, materiale già funzionavano.
+
 ## Quicksell 1.4.12
 
 **1.4.12** — ora seleziona davvero: le opzioni Vinted sono <div role=checkbox/radio> con aria-label esatto (es. “L”). Clicco quell’elemento e verifico che sia spuntato. Vale per taglia, condizioni, colore, materiale.

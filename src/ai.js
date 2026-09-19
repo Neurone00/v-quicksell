@@ -73,13 +73,28 @@ const ANALYSIS_SCHEMA = {
   required: ['title', 'description', 'condition', 'category_query', 'search_query', 'missing'],
 };
 
-// Photos in, a full Italian Vinted listing out.
-export async function analysePhotos(env, images) {
+const CONDITIONS = ['Nuovo con cartellino', 'Nuovo senza cartellino', 'Ottime condizioni', 'Buone condizioni', 'Discrete condizioni'];
+
+// Force the AI to answer only with values Vinted's own menus accept, so the
+// extension fills each dropdown with an exact match and nothing is left to you.
+// color/material lists are harvested from the live Vinted form (env-provided);
+// condition is fixed. size stays free — its options depend on the category.
+function schemaWith(enums) {
+  const s = JSON.parse(JSON.stringify(ANALYSIS_SCHEMA));
+  s.properties.condition.enum = CONDITIONS;
+  if (enums?.color?.length) s.properties.color.enum = enums.color;
+  if (enums?.material?.length) s.properties.material.enum = enums.material;
+  return s;
+}
+
+// Photos in, a full Italian Vinted listing out. `enums` = Vinted's real option
+// lists (from KV), when the extension has harvested them yet.
+export async function analysePhotos(env, images, enums) {
   const parts = [
     { text: PROMPT_ANALYSE },
     ...images.map((b64) => ({ inlineData: { mimeType: 'image/jpeg', data: b64 } })),
   ];
-  return applyBrandRule(await gemini(env, parts, ANALYSIS_SCHEMA));
+  return applyBrandRule(await gemini(env, parts, schemaWith(enums)));
 }
 
 // The user's rule, kept pure so it can be tested: a brand claim must be backed

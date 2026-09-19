@@ -160,13 +160,21 @@ function matchOpt(text, want, mode) {
   if (mode === 'brand') return text.includes(w);
   return text === w || text.startsWith(w) || w.startsWith(text) || text.includes(w); // phrase
 }
+// Vinted's global option lists, captured as we open the menus, sent to the app
+// so the AI can be constrained to them (1:1 fill). Only the category-independent
+// lists — brand is a search box, size depends on the category.
+const HARVEST = {};
 // Open the input's menu and click the option matching `want`. Returns
 // 'ok' | 'nomatch' (menu opened, no option fit) | 'nomenu' (couldn't open).
-async function pickInput(input, want, mode) {
+async function pickInput(input, want, mode, harvestKey) {
   if (input.value.trim()) return 'ok';                 // already chosen — don't touch
   const before = new Set(document.querySelectorAll(menuSel));
   input.focus(); input.click();
   let menu = await waitMenu(before);
+  if (menu && harvestKey) {                            // full list, before any type-filter
+    const all = optionEls(menu).map((o) => o.textContent.trim());
+    if (all.length > (HARVEST[harvestKey]?.length || 0)) HARVEST[harvestKey] = all;
+  }
   // brand (and any type-to-filter field): narrow by typing, then re-scan
   if (mode === 'brand' || (menu && !optionEls(menu).some((o) => matchOpt(norm(o.textContent), want, mode)))) {
     type(input, mode === 'first' ? want.split(' ')[0] : want);
@@ -195,9 +203,9 @@ function autoFill(it) {
   const jobs = [
     { key: 'Prezzo', id: 'price', price: true, val: it.list_price },
     { key: 'Taglia', id: 'size', val: it.size, mode: 'token' },
-    { key: 'Condizioni', id: 'condition', val: it.condition, mode: 'phrase' },
-    { key: 'Colore', id: 'color', val: it.color, mode: 'first' },
-    { key: 'Materiale', id: 'material', val: it.material, mode: 'first' },
+    { key: 'Condizioni', id: 'condition', val: it.condition, mode: 'phrase', harvest: 'condition' },
+    { key: 'Colore', id: 'color', val: it.color, mode: 'first', harvest: 'color' },
+    { key: 'Materiale', id: 'material', val: it.material, mode: 'first', harvest: 'material' },
     { key: 'Marca', id: 'brand', val: it.brand, mode: 'brand' },
   ].map((j) => ({ ...j, done: !j.val }));   // nothing to set → already "done"
   let running = false;
@@ -205,6 +213,8 @@ function autoFill(it) {
     obs.disconnect(); clearInterval(iv);
     const left = jobs.filter((j) => !j.done && j.val);
     setAutoStatus(left.map((j) => j.key));
+    // send Vinted's real option lists so the AI can be constrained to them 1:1
+    if (Object.keys(HARVEST).length) send({ type: 'api', path: '/api/enums', method: 'POST', body: { enums: HARVEST } });
     // report the menu DOM of whatever we couldn't fill, so it can be fixed precisely
     if (left.length) {
       const fields = {};
@@ -220,7 +230,7 @@ function autoFill(it) {
         const el = document.getElementById(j.id);
         if (!el) continue;                     // field not rendered yet (before category)
         if (j.price) { if (!el.value) type(el, String(j.val)); j.done = true; continue; }
-        const r = await pickInput(el, j.val, j.mode);
+        const r = await pickInput(el, j.val, j.mode, j.harvest);
         if (r === 'ok') j.done = true;         // retry on 'nomenu'/'nomatch' next tick
       }
     } finally { running = false; }

@@ -303,6 +303,19 @@ async function route(p, req, env, ctx, url, user) {
   }
   if (p === '/api/learned') return json(JSON.parse((await env.KV.get('learned')) || '[]'));
 
+  // The extension harvests Vinted's real dropdown options and posts them here;
+  // the analyzer then constrains the AI to exactly these, for a 1:1 fill.
+  if (p === '/api/enums' && req.method === 'POST') {
+    const body = await req.json().catch(() => ({}));
+    const cur = JSON.parse((await env.KV.get('vinted_enums')) || '{}');
+    for (const [k, v] of Object.entries(body.enums || {})) {
+      if (Array.isArray(v) && v.length) cur[k] = [...new Set(v.map((s) => String(s).trim()).filter(Boolean))].slice(0, 200);
+    }
+    await env.KV.put('vinted_enums', JSON.stringify(cur));
+    return json({ ok: true, have: Object.fromEntries(Object.entries(cur).map(([k, v]) => [k, v.length])) });
+  }
+  if (p === '/api/enums') return json(JSON.parse((await env.KV.get('vinted_enums')) || '{}'));
+
   // Escape hatch for when Google retires a model again.
   if (p === '/api/models') {
     if (url.searchParams.get('test')) {
@@ -422,7 +435,8 @@ async function analyse(env, id) {
       const buf = await env.KV.get(PHOTO + k, 'arrayBuffer');
       if (buf) b64.push(bufToB64(buf));
     }
-    const a = await analysePhotos(env, b64);
+    const enums = JSON.parse((await env.KV.get('vinted_enums')) || '{}');
+    const a = await analysePhotos(env, b64, enums);
 
     // Our own sales are the only true settled prices we have.
     const { results: mine } = await db

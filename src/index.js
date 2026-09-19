@@ -135,14 +135,22 @@ export default {
 async function latestRelease(env) {
   const cached = await env.KV.get('ext_release', 'json');
   if (cached) return cached;
-  const r = await fetch('https://api.github.com/repos/Neurone00/v-quicksell/releases/latest', {
+  // Newest release that actually carries a .crx. "latest" alone can be a
+  // release whose assets are still uploading — and a cached miss would then
+  // hide the update for ten minutes. Never cache a miss.
+  const r = await fetch('https://api.github.com/repos/Neurone00/v-quicksell/releases?per_page=5', {
     headers: { accept: 'application/vnd.github+json', 'user-agent': 'quicksell-worker' }, signal: AbortSignal.timeout(10000),
   });
   if (!r.ok) return null;
-  const j = await r.json();
-  const out = { version: String(j.tag_name || '').replace(/^v/, ''), crx: (j.assets || []).find((a) => a.name.endsWith('.crx'))?.browser_download_url || null };
-  await env.KV.put('ext_release', JSON.stringify(out), { expirationTtl: 600 });
-  return out;
+  for (const j of await r.json()) {
+    if (j.draft || j.prerelease) continue;
+    const crx = (j.assets || []).find((a) => a.name.endsWith('.crx'))?.browser_download_url;
+    if (!crx) continue;
+    const out = { version: String(j.tag_name || '').replace(/^v/, ''), crx };
+    await env.KV.put('ext_release', JSON.stringify(out), { expirationTtl: 600 });
+    return out;
+  }
+  return null;
 }
 
 const parseItem = (r) => ({

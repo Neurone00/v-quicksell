@@ -220,14 +220,20 @@ async function pickInput(input, want, mode, harvestKey) {
   if (!menu) return 'nomenu';
   const hit = optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), want, mode));
   if (!hit) { closeMenu(); return 'nomatch'; }
-  const wasChecked = hit.getAttribute && hit.getAttribute('aria-checked');
+  // Already selected? Never click again — a second click UNchecks a checkbox
+  // (that's the material flicker: select → false 'nomatch' → re-click → off).
+  if (isChosen(hit, input)) { closeMenu(); return 'ok'; }
   selectOption(hit);
   await sleep2(250);
-  // confirm it registered: the field input got a value, or the option is now checked
-  const ok = input.value.trim() || hit.getAttribute?.('aria-checked') === 'true'
-    || (wasChecked === 'false' && hit.getAttribute?.('aria-checked') !== 'false');
+  const ok = isChosen(hit, input);
   closeMenu();
   return ok ? 'ok' : 'nomatch';
+}
+// Is this option (or its field) already selected?
+function isChosen(hit, fieldInput) {
+  return !!((fieldInput && fieldInput.value.trim())
+    || hit.getAttribute?.('aria-checked') === 'true'
+    || hit.querySelector?.('input:checked'));
 }
 // Snapshot what a field's menu looks like, so a failure is debuggable without guessing.
 async function probe(input) {

@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.14
+
+**1.4.14** — stop al “materiale impazzito”: se un’opzione è già spuntata non la riclicco (un secondo click su una casella la toglieva).
+
 ## Quicksell 1.4.13
 
 **1.4.13** — condizioni ora si seleziona (era un radio col titolo dentro una Cell, non un aria-label), e i menu si chiudono da soli invece di accavallarsi. Taglia, colore, materiale già funzionavano.

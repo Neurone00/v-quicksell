@@ -96,6 +96,26 @@ export default {
     }
 
     if (p === '/api/version') return json({ version: env.APP_VERSION });
+
+    // Self-hosted extension updates. Chrome, installed via policy with this
+    // update URL, checks updates.xml every few hours and pulls the .crx from
+    // the latest GitHub Release — no zip, no Store. Unauthenticated on purpose:
+    // Chrome's updater carries no cookie, and the repo is public anyway.
+    if (p === '/ext/updates.xml' || p === '/ext/quicksell.crx') {
+      const rel = await latestRelease(env);
+      if (!rel?.crx) return new Response('no release with a .crx yet', { status: 404 });
+      if (p === '/ext/updates.xml') {
+        const xml = `<?xml version='1.0' encoding='UTF-8'?>
+<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
+  <app appid='${env.EXT_ID}'>
+    <updatecheck codebase='${env.PUBLIC_URL}/ext/quicksell.crx' version='${rel.version}' />
+  </app>
+</gupdate>`;
+        return new Response(xml, { headers: { 'content-type': 'application/xml', 'cache-control': 'public, max-age=300' } });
+      }
+      const r = await fetch(rel.crx, { redirect: 'follow' });
+      return new Response(r.body, { status: r.status, headers: { 'content-type': 'application/x-chrome-extension', 'cache-control': 'public, max-age=300' } });
+    }
     const user = await userOf(req, env);
     if (!user) return json({ error: 'unauthorized' }, 401);
 
@@ -110,6 +130,19 @@ export default {
     ctx.waitUntil(event.cron === '0 9 * * *' ? dailyRound(env) : drainQueue(env));
   },
 };
+
+async function latestRelease(env) {
+  const cached = await env.KV.get('ext_release', 'json');
+  if (cached) return cached;
+  const r = await fetch('https://api.github.com/repos/Neurone00/v-quicksell/releases/latest', {
+    headers: { accept: 'application/vnd.github+json', 'user-agent': 'quicksell-worker' }, signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) return null;
+  const j = await r.json();
+  const out = { version: String(j.tag_name || '').replace(/^v/, ''), crx: (j.assets || []).find((a) => a.name.endsWith('.crx'))?.browser_download_url || null };
+  await env.KV.put('ext_release', JSON.stringify(out), { expirationTtl: 600 });
+  return out;
+}
 
 const parseItem = (r) => ({
   ...r,

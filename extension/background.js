@@ -1,16 +1,20 @@
 // The only piece that talks to the app. host_permissions lets it call the
 // Worker without CORS; content scripts and the popup go through here.
-const cfg = () => chrome.storage.sync.get({ appUrl: '', secret: '' });
+// No key to configure: Chrome sends the app's login cookie with these calls
+// (host_permissions), so the extension is logged in whenever the app is in
+// this Chrome. A key can still be set under Avanzate for another instance.
+const DEFAULT_APP = 'https://v-quicksell.neurone00.workers.dev';
+const cfg = () => chrome.storage.sync.get({ appUrl: DEFAULT_APP, secret: '' });
 
 async function appUrl(path) {
   const { appUrl, secret } = await cfg();
-  if (!appUrl || !secret) throw new Error('NOT_CONFIGURED');
-  const u = new URL(path, appUrl);
-  u.searchParams.set('k', secret);
+  const u = new URL(path, appUrl || DEFAULT_APP);
+  if (secret) u.searchParams.set('k', secret);
   return u;
 }
 async function api(path, init = {}) {
-  const r = await fetch(await appUrl(path), init);
+  const r = await fetch(await appUrl(path), { credentials: 'include', ...init });
+  if (r.status === 401) throw new Error('NOT_LOGGED_IN');
   return r.json();
 }
 
@@ -156,9 +160,7 @@ async function checkUpdate() {
     const mine = chrome.runtime.getManifest().version;
     if (latest && cmpVer(latest, mine) > 0) {
       const asset = (rel.assets || []).find((a) => /\.zip$/.test(a.name));
-      await chrome.storage.local.set({ update: { version: latest, zip: asset?.browser_download_url || rel.html_url, page: rel.html_url } });
-      chrome.action.setBadgeText({ text: '1' });
-      chrome.action.setBadgeBackgroundColor({ color: '#B4690E' });
+      await chrome.storage.local.set({ update: { version: latest, page: rel.html_url } });
     } else {
       await chrome.storage.local.remove('update');
       chrome.action.setBadgeText({ text: '' });

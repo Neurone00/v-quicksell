@@ -32,6 +32,7 @@
     "APP_VERSION": "1.0.0",
     "APK_VERSION": "1.0.0",
     "PUBLIC_URL": "https://v-quicksell.neurone00.workers.dev",
+    "EXT_ID": "ceffnhbkhebjpmdfdfinpmegnclgbknf",
     "ACCESS_TEAM": "",
     "ACCESS_AUD": "",
     "VAPID_PUBLIC": "BEJJOG4gqZcBfQ774L-lycB5q-dP63GY0zLQljQi62g4ktg840ASHTqW22yJxESMRO7sIVFkvHNee6zlPQpVtqI"

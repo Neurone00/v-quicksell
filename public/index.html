@@ -241,7 +241,36 @@ function renderSetup(st) {
           ${pushBlocked() ? `<button class="sec" style="margin:12px 0 0 8px" onclick="waive()">Continua senza</button>` : ''}`}
       </div></div>
     ${done ? `<button class="sec" style="width:100%;margin-top:14px" onclick="showSetup=false;refresh()">Chiudi</button>` : ''}
-  </div>`;
+  </div>` + (st.user === 'owner' && showSetup ? accountsCard() : '');
+  if (st.user === 'owner' && showSetup) loadAccounts();
+}
+
+// Accounts: the owner adds a person by name and gets a link to send them.
+// Each person has their own drafts, notifications and drops; the extension
+// follows whoever is logged into the app in that Chrome.
+function accountsCard() {
+  return `<div class="card onb" id="acct"><h2>Account</h2>
+    <p style="margin:4px 0 12px">Ogni persona vede solo i propri capi. Mandale il link: lo apre una volta e ha finito.</p>
+    <div id="acctlist" class="v">…</div>
+    <div class="row" style="margin-top:12px"><input id="acctname" placeholder="nome (es. test, marco)" autocomplete="off">
+      <button onclick="addAccount()">Aggiungi</button></div>
+    <div id="acctnew"></div></div>`;
+}
+async function loadAccounts() {
+  const r = await api('/users');
+  const el = $('#acctlist'); if (!el) return;
+  el.innerHTML = r.users ? r.users.map((u) => `<span class="badge ${u === 'owner' ? 'live' : ''}" style="margin:0 6px 6px 0">${esc(u)}</span>`).join('') : esc(r.error || '');
+}
+window.addAccount = async () => {
+  const name = $('#acctname').value.trim(); if (!name) return;
+  const r = await api('/users', { method: 'POST', body: JSON.stringify({ name }) });
+  const out = $('#acctnew');
+  if (r.error) { out.innerHTML = `<div class="warn">${esc(r.error)}</div>`; return; }
+  $('#acctname').value = '';
+  out.innerHTML = `<div class="hint" style="margin-top:10px"><b>${esc(r.name)}</b> — link di accesso (una volta sola, poi resta):<br>
+    <code style="word-break:break-all;display:block;margin:6px 0">${esc(r.url)}</code>
+    <button class="sec" onclick="copyText(${JSON.stringify(r.url)},this)">Copia link</button></div>`;
+  loadAccounts();
 }
 
 function apkBanner(st) {

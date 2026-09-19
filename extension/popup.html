@@ -19,11 +19,13 @@ small{color:var(--muted)}
 </style>
 <h1><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></svg>Quicksell</h1>
 <div id="upd"></div>
+<div id="conn" class="card"><small>Controllo il collegamento…</small></div>
+<details><summary style="cursor:pointer;font-size:12px;color:var(--muted);margin:6px 0">Avanzate</summary>
 <div id="setup">
-  <label>Indirizzo dell'app</label><input id="appUrl" placeholder="https://v-quicksell….workers.dev">
-  <label>Chiave</label><input id="secret" type="password" placeholder="la chiave dopo ?k=">
+  <label>Indirizzo dell'app</label><input id="appUrl" placeholder="https://v-quicksell.neurone00.workers.dev">
+  <label>Chiave (solo per un'altra istanza)</label><input id="secret" type="password" placeholder="vuoto = usa il login dell'app">
   <button id="save">Salva</button> <small id="st"></small>
-</div>
+</div></details>
 <div id="due"></div>
 <h2>Se qualcosa non si compila</h2>
 <button id="diag" style="margin-top:0">Diagnostica la pagina Vinted aperta</button>

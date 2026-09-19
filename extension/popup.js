@@ -3,14 +3,26 @@ const send = (msg) => new Promise((res) => chrome.runtime.sendMessage(msg, res))
 
 chrome.storage.local.get('update', ({ update }) => {
   if (!update) return;
-  $('#upd').innerHTML = `<div class="card upd"><b>Versione ${update.version} disponibile</b><br>
-    <small>Scarica lo zip, sostituisci la cartella dell'estensione, poi in chrome://extensions premi ↻.</small><br>
-    <a href="${update.zip}" target="_blank">Scarica</a> · <a href="${update.page}" target="_blank">Cosa c'è di nuovo</a></div>`;
+  $('#upd').innerHTML = `<div class="card upd"><b>Versione ${update.version} in arrivo</b><br>
+    <small>Chrome la installa da solo entro qualche ora. Per subito: chrome://extensions → Aggiorna.</small>
+    <a href="${update.page}" target="_blank">Cosa c'è di nuovo</a></div>`;
 });
-chrome.storage.sync.get({ appUrl: '', secret: '' }, (c) => { $('#appUrl').value = c.appUrl; $('#secret').value = c.secret; if (c.appUrl) load(); });
+chrome.storage.sync.get({ appUrl: 'https://v-quicksell.neurone00.workers.dev', secret: '' }, (c) => { $('#appUrl').value = c.appUrl; $('#secret').value = c.secret; load(); });
+
+async function connection() {
+  const r = await send({ type: 'api', path: '/api/status', method: 'GET' });
+  const box = $('#conn');
+  if (r.ok) { box.innerHTML = `<small>Collegato come <b>${r.data.user}</b>.</small>`; return true; }
+  const app = (await chrome.storage.sync.get({ appUrl: 'https://v-quicksell.neurone00.workers.dev' })).appUrl;
+  box.innerHTML = /NOT_LOGGED_IN/.test(r.error)
+    ? `Non sei ancora entrato nell'app in questo Chrome.<br><a href="${app}" target="_blank">Apri l'app</a> con il tuo link di accesso, poi riapri questo pannello.`
+    : `Non raggiungo l'app: ${r.error}`;
+  return false;
+}
 $('#save').onclick = () => chrome.storage.sync.set({ appUrl: $('#appUrl').value.trim().replace(/\/$/, ''), secret: $('#secret').value.trim() }, () => { $('#st').textContent = 'Salvato'; load(); });
 
 async function load() {
+  if (!(await connection())) { $('#due').innerHTML = ''; return; }
   const r = await send({ type: 'api', path: '/api/due', method: 'GET' });
   const box = $('#due');
   if (!r.ok) { box.innerHTML = `<div class="card">Non raggiungo l'app: ${r.error}</div>`; return; }

@@ -1,8 +1,12 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
-## Quicksell 1.2.0
+## Quicksell 1.3.0
 
-**New in 1.2.0**
+**New in 1.3.0**
+- **Updates itself.** Installed through Chrome policy, the extension checks the app every few hours and installs new versions silently. No zip, ever again.
+- **No key to enter.** It uses the app's own login in this Chrome: open the app once, the extension is connected.
+
+**1.2.0**
 - **Diagnostica** in the popup: on a Vinted listing page it reports which fields it can see and which it can't, and copies a report. Use it if Compila leaves something empty.
 - Per-user keys: the app supports more than one account; each extension install carries one user's key.
 - Popup and panel use the brand faces.
@@ -16,7 +20,11 @@
 
 **App:** https://v-quicksell.neurone00.workers.dev — open once per device with `?k=<APP_SECRET>`; on Android, Add to home screen.
 
-**Extension (attached zip):** unzip → Chrome `chrome://extensions` → Developer mode → **Load unpacked** → pick the folder → click its icon → enter the app URL and your key.
+**Extension:** one command in Terminal, once, then quit and reopen Chrome (it installs and updates itself from then on):
+```
+defaults write com.google.Chrome ExtensionInstallForcelist -array-add "ceffnhbkhebjpmdfdfinpmegnclgbknf;https://v-quicksell.neurone00.workers.dev/ext/updates.xml"
+```
+Then open the app once in Chrome with your login link. The extension is connected. (Remove any previously loaded unpacked copy.)
 
 ### What it does
 - Phone: share photos to Quicksell → Italian listing + price, grounded in Vinted's public catalog → approve.

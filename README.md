@@ -22,7 +22,7 @@ ban, and nothing to expire.
 | How the extension works (clickable) | https://claude.ai/artifact/FervEcfhPGmtUiWiLjdp5M |
 | Brand & design system | https://claude.ai/artifact/JG9FVAdCfoAnH8axsdSE6u · source: [brand/BRAND.md](brand/BRAND.md), [brand/tokens.css](brand/tokens.css), [brand/mark.svg](brand/mark.svg) |
 
-New extension version: bump `extension/manifest.json`, edit `RELEASE.md`, push. A GitHub Action cuts the release; the extension notices within a day and offers the update. (`npm run release` does the same by hand.)
+New extension version: bump `extension/manifest.json`, edit `RELEASE.md`, push. A GitHub Action signs a .crx and cuts the release; Chrome installs it on its next check. (`npm run release` does the same by hand.)
 
 ## The flow
 
@@ -67,9 +67,21 @@ Tap **Attiva** on notifications. That is the entire onboarding.
 
 ### 3. Computer — the extension
 
-Download the latest zip from [Releases](https://github.com/Neurone00/v-quicksell/releases), unzip. Chrome (Edge and Brave work too) → `chrome://extensions` → **Developer mode** →
-**Load unpacked** → pick the folder. Click its icon, enter the app
-URL and your `APP_SECRET`, save.
+It installs and updates itself. One command in Terminal, once, then quit and
+reopen Chrome:
+
+```bash
+defaults write com.google.Chrome ExtensionInstallForcelist -array-add "ceffnhbkhebjpmdfdfinpmegnclgbknf;https://v-quicksell.neurone00.workers.dev/ext/updates.xml"
+```
+
+Chrome installs the extension from the app's `/ext/updates.xml` and checks it
+every few hours; a new release is picked up without you doing anything. Chrome
+shows "managed by your organisation" — that's this policy. No key to enter:
+open the app once in Chrome with your login link and the extension uses that
+login. (For another instance, the app URL and a key can be set under Avanzate.)
+
+Without the policy, the zip on Releases still works via Load unpacked — but
+then updates are manual.
 
 The first time it opens `vinted.it/items/new` it reports Vinted's live form to
 the app (`GET /api/learned`). Vinted's form is React-rendered and undocumented,

@@ -73,7 +73,8 @@ const ANALYSIS_SCHEMA = {
   required: ['title', 'description', 'condition', 'category_query', 'search_query', 'missing'],
 };
 
-const CONDITIONS = ['Nuovo con cartellino', 'Nuovo senza cartellino', 'Ottime condizioni', 'Buone condizioni', 'Discrete condizioni'];
+// Vinted's real option titles (short — the long text on the form is a description).
+const CONDITIONS = ['Nuovo con cartellino', 'Nuovo senza cartellino', 'Ottime', 'Buone', 'Discrete'];
 
 // Force the AI to answer only with values Vinted's own menus accept, so the
 // extension fills each dropdown with an exact match and nothing is left to you.
@@ -163,7 +164,7 @@ REGOLE:
 - brand: SOLO se leggi il nome su un'etichetta, un cartellino o un logo stampato nelle foto. Metti brand_from_label=true solo in quel caso. Se deduci la marca dallo stile senza vederla scritta, scrivila comunque ma brand_from_label=false.
 - size: SOLO dall'etichetta taglia. size_from_label=true solo se la leggi. Usa la notazione dell'etichetta (XS/S/M/L, o 38/40/42).
 - material: dall'etichetta di composizione se visibile.
-- condition: uno tra "Nuovo con cartellino", "Nuovo senza cartellino", "Ottime condizioni", "Buone condizioni", "Discrete condizioni". Sii onesto: i resi e le recensioni negative costano piu di qualche euro.
+- condition: ESATTAMENTE uno tra "Nuovo con cartellino", "Nuovo senza cartellino", "Ottime", "Buone", "Discrete" (sono le etichette esatte di Vinted). Sii onesto: i resi e le recensioni negative costano piu di qualche euro.
 - category_query: 2-4 parole per trovare la categoria Vinted, es "felpa donna cappuccio".
 - search_query: la query con cui cercare su Vinted articoli identici per confrontare i prezzi. Marca + tipo + taglia se noti.
 - missing: elenca i campi che NON riesci a determinare con certezza dalle foto (es "size", "brand", "material"). Se manca la foto dell'etichetta, dillo.`;

@@ -156,9 +156,13 @@ const closeMenu = () => document.dispatchEvent(new KeyboardEvent('keydown', { ke
 function matchOpt(text, want, mode) {
   const w = norm(want);
   if (mode === 'token') return text.split(/[^a-z0-9]+/).includes(w);           // "L" ≠ "XL"
-  if (mode === 'first') return text.split(' ').includes(w.split(' ')[0]) || text.includes(w.split(' ')[0]);
+  if (mode === 'first') { const f = w.split(' ')[0]; return text.split(/[^a-z0-9]+/).includes(f) || text.startsWith(f); }
   if (mode === 'brand') return text.includes(w);
-  return text === w || text.startsWith(w) || w.startsWith(text) || text.includes(w); // phrase
+  // phrase (condition): each option starts with its short title then a long
+  // description. Ignore a trailing "condizioni" so a stored "Buone condizioni"
+  // still matches Vinted's "Buone".
+  const ww = w.replace(/ condizioni$/, '');
+  return text === w || text.startsWith(ww) || ww.startsWith(text) || text.includes(' ' + ww + ' ');
 }
 // Vinted's global option lists, captured as we open the menus, sent to the app
 // so the AI can be constrained to them (1:1 fill). Only the category-independent
@@ -172,7 +176,9 @@ async function pickInput(input, want, mode, harvestKey) {
   input.focus(); input.click();
   let menu = await waitMenu(before);
   if (menu && harvestKey) {                            // full list, before any type-filter
-    const all = optionEls(menu).map((o) => o.textContent.trim());
+    // keep only short, clean labels — options with a long description (e.g.
+    // condizioni) would pollute the enum we send the AI.
+    const all = optionEls(menu).map((o) => o.textContent.trim()).filter((t) => t.length <= 28);
     if (all.length > (HARVEST[harvestKey]?.length || 0)) HARVEST[harvestKey] = all;
   }
   // brand (and any type-to-filter field): narrow by typing, then re-scan

@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.10
+
+**1.4.10** — condizioni ora si compila: le etichette vere di Vinted sono “Ottime”/“Buone” (non “Ottime condizioni”). Corretto sia l’AI sia la corrispondenza, comprese le bozze già fatte.
+
 ## Quicksell 1.4.9
 
 **1.4.9** — corrispondenza 1:1 coi menu Vinted: l'estensione impara le opzioni vere di colore/materiale/condizioni dal modulo e l'app le usa per far scegliere all'AI solo valori validi. Così i menu si riempiono da soli senza il tuo intervento.

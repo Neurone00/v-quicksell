@@ -299,8 +299,14 @@ function stepRow(step, st, isActive) {
     <span class="tick">${done ? '✓' : '·'}</span><span>${step.title}</span></div>`;
 
   const field = step.key === 'session'
-    ? `<p style="margin:8px 0 0;font-size:12.5px">Si apre Vinted qui dentro: accedi come fai di
-       solito — Google, Apple o password. L'app tiene solo la sessione, non vede le tue credenziali.</p>`
+    ? `<p style="margin:8px 0 0;font-size:12.5px">Si apre Vinted qui dentro e l'app tiene solo la
+       sessione, mai le tue credenziali.</p>
+       <div class="warn" style="margin-top:8px">Google blocca l'accesso dai browser automatici
+       ("questo browser potrebbe non essere sicuro"), quindi qui il tasto Google non funziona.
+       Funzionano <b>e-mail e password</b>: se il tuo account è nato con Google, impostane una
+       con "Password dimenticata" su Vinted, una volta sola.</div>
+       <p style="margin:8px 0 0;font-size:12.5px"><a href="#" onclick="event.preventDefault();cookieFallback()"
+         style="color:var(--calypso)">Oppure collega da computer incollando i cookie →</a></p>`
     : '';
 
   // Notifications denied at browser level: no button here can ever satisfy it.
@@ -459,10 +465,18 @@ window.relayStop = async () => {
 };
 
 window.cookieFallback = async () => {
-  const c = prompt('Da computer: apri vinted.it già collegato, F12 > Console, scrivi  document.cookie  e incolla qui il risultato.');
+  const c = prompt(
+    'Da computer, una volta sola:\n\n' +
+    '1. Apri vinted.it e accedi come fai di solito (Google va benissimo).\n' +
+    '2. Premi F12, scheda Console.\n' +
+    '3. Scrivi:  document.cookie\n' +
+    '4. Copia tutto il risultato e incollalo qui.\n\n' +
+    'Dopo questo il telefono funziona da solo: la sessione resta sul server.'
+  );
   if (!c) return;
-  const r = await api('/session', { method:'POST', body: JSON.stringify({ cookie: c }) });
-  if (r.error) alert(r.error);
+  const r = await api('/session', { method:'POST', body: JSON.stringify({ cookie: c.trim() }) });
+  if (r.error) return alert(r.error);
+  alert(`Collegato — ${r.cookies} cookie salvati. Da qui in poi puoi usare solo il telefono.`);
   refresh();
 };
 

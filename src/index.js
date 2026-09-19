@@ -62,6 +62,18 @@ async function userOf(req, env) {
   return users[k] || null;
 }
 
+// ponytail: Resend REST, no SDK. No RESEND_API_KEY set -> returns false and
+// recovery silently does nothing (still answers ok, so it never leaks accounts).
+async function sendEmail(env, to, subject, html) {
+  if (!env.RESEND_API_KEY) return false;
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ from: env.MAIL_FROM || 'Quicksell <onboarding@resend.dev>', to, subject, html }),
+  });
+  return r.ok;
+}
+
 async function photoToken(env, key) {
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key + (env.APP_SECRET || '')));
   return [...new Uint8Array(d)].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -137,8 +149,35 @@ export default {
       return json({ key, user: name, url: `${env.PUBLIC_URL}/?k=${key}`, claimed: caller === 'owner' });
     }
 
+    if (p === '/api/recover' && req.method === 'POST') {
+      const { email } = await req.json().catch(() => ({}));
+      const addr = String(email || '').trim().toLowerCase();
+      if (addr) {
+        const key = await env.KV.get(`email:${addr}`);
+        if (key) await sendEmail(env, addr, 'Il tuo accesso a Quicksell',
+          `<p>Tocca per rientrare nel tuo account Quicksell:</p>
+           <p><a href="${env.PUBLIC_URL}/?k=${key}">Apri Quicksell</a></p>
+           <p style="color:#888;font-size:13px">Se non l'hai chiesto tu, ignora questo messaggio.</p>`);
+      }
+      return json({ ok: true });   // always neutral
+    }
+
     const user = await userOf(req, env);
     if (!user) return json({ error: 'unauthorized' }, 401);
+
+    // Bind an email to this account so a lost key can be recovered.
+    if (p === '/api/bind-email' && req.method === 'POST') {
+      const { email } = await req.json().catch(() => ({}));
+      const addr = String(email || '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(addr)) return json({ error: 'email non valida' }, 400);
+      const k = keyOf(req);
+      if (!k || k === env.APP_SECRET) return json({ error: 'crea prima un account' }, 400);
+      const prev = await env.KV.get(`emailof:${user}`);
+      if (prev && prev !== addr) await env.KV.delete(`email:${prev}`);
+      await env.KV.put(`email:${addr}`, k);
+      await env.KV.put(`emailof:${user}`, addr);
+      return json({ ok: true, email: addr });
+    }
 
     try {
       return await route(p, req, env, ctx, url, user);
@@ -192,6 +231,8 @@ async function route(p, req, env, ctx, url, user) {
       version: env.APP_VERSION,
       apk_version: env.APK_VERSION,
       vapid_public: env.VAPID_PUBLIC,
+      email: await env.KV.get(`emailof:${user}`),
+      mail_ready: !!env.RESEND_API_KEY,
       counts: Object.fromEntries((counts.results || []).map((r) => [r.status, r.n])),
     });
   }

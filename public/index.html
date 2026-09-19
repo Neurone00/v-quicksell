@@ -205,13 +205,45 @@ async function refresh() {
   mountAnims();
 }
 
+function emailCard(st) {
+  const has = st.email;
+  return `<div class="card">
+    <h2>Email di recupero</h2>
+    <p style="margin:6px 0 10px">${has ? `Collegata: <b>${esc(st.email)}</b>. Se perdi la chiave, la recuperi da qui con un link.` : 'Collega un\'email: se perdi la chiave, te la rimandiamo con un link. Niente password.'}</p>
+    <input id="bindmail" type="email" placeholder="${has ? esc(st.email) : 'la-tua@email.it'}" style="width:100%;padding:10px;border:1px solid var(--line,#ccc);border-radius:8px">
+    <button style="margin-top:8px" onclick="bindEmail()">${has ? 'Aggiorna' : 'Collega'}</button>
+    <span id="bindmsg" style="margin-left:8px"></span>
+    ${st.mail_ready ? '' : '<p style="margin:8px 0 0;font-size:12px;color:#9a6a12">Invio email non ancora configurato lato server.</p>'}
+  </div>`;
+}
+async function bindEmail() {
+  const email = $('#bindmail').value.trim();
+  if (!email) return;
+  const r = await api('/bind-email', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
+  $('#bindmsg').textContent = r.ok ? 'Collegata ✓' : (r.error || 'errore');
+  if (r.ok) refresh();
+}
+
 function locked() {
   $('#ver').textContent = ''; $('#list').innerHTML = '';
   $('#add').style.display = 'none'; $('#gear').style.display = 'none';
   $('#setup').innerHTML = `<div class="card"><h2>Accesso richiesto</h2>
     <p style="margin-top:6px">Apri l'app aggiungendo la tua chiave all'indirizzo:<br>
     <code style="color:var(--calypso)">…workers.dev/?k=LA_TUA_CHIAVE</code></p>
-    <p>Basta una volta per dispositivo: dopo resta salvata in un cookie.</p></div>`;
+    <p>Basta una volta per dispositivo: dopo resta salvata in un cookie.</p>
+    <div style="border-top:1px solid var(--line,#e2e0d8);margin-top:12px;padding-top:12px">
+      <b>Persa la chiave?</b>
+      <p style="margin:4px 0 8px">Se hai collegato un'email, te la rimandiamo con un link.</p>
+      <input id="recmail" type="email" placeholder="la-tua@email.it" style="width:100%;padding:10px;border:1px solid var(--line,#ccc);border-radius:8px">
+      <button style="margin-top:8px" onclick="recover()">Rimandami il link</button>
+      <span id="recmsg" style="margin-left:8px"></span>
+    </div></div>`;
+}
+async function recover() {
+  const email = $('#recmail').value.trim();
+  if (!email) return;
+  await api('/recover', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
+  $('#recmsg').textContent = 'Se l\'email è collegata, controlla la posta.';
 }
 
 // One step. Vinted is never connected: the app reads public pages only.
@@ -241,7 +273,7 @@ function renderSetup(st) {
           ${pushBlocked() ? `<button class="sec" style="margin:12px 0 0 8px" onclick="waive()">Continua senza</button>` : ''}`}
       </div></div>
     ${done ? `<button class="sec" style="width:100%;margin-top:14px" onclick="showSetup=false;refresh()">Chiudi</button>` : ''}
-  </div>` + (st.user === 'owner' && showSetup ? accountsCard() : '');
+  </div>` + (showSetup ? emailCard(st) : '') + (st.user === 'owner' && showSetup ? accountsCard() : '');
   if (st.user === 'owner' && showSetup) loadAccounts();
 }
 

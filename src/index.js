@@ -147,7 +147,7 @@ async function route(p, req, env, ctx) {
 
   if (p === '/api/reach') return json(await V.reachability(env));
 
-  if (p === '/api/probe') return json(await V.probe(env, url.searchParams.get('q')));
+  if (p === '/api/probe') return json(await V.probe(env, url.searchParams.get('q'), url.searchParams.get('photo')));
 
   // Escape hatch for when Google retires a model again: lists what this key can
   // use, and with ?test=1 times each candidate so you can see which are healthy.

@@ -268,18 +268,40 @@ async function cookieHeader(env) {
   return jar.map((c) => `${c.name}=${c.value}`).join('; ');
 }
 
-// Vinted wants a CSRF token on writes. It lives in a meta tag on any page.
+// Vinted wants a CSRF token on writes. It is NOT a <meta> tag — it lives in the
+// Next.js config blob as "CSRF_TOKEN":"<uuid>", about 300KB into a 2MB page.
+// Both of those caught me out: the meta selector never matched, and the first
+// 200KB I used to read would have missed it anyway. Every write was going out
+// with an empty token, which is what Vinted answered 403 to.
+const CSRF_RE = /CSRF_TOKEN[\\"\s:]+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/;
+
 async function csrf(env, cookie) {
   const cached = await env.KV.get('csrf');
   if (cached) return cached;
+
   const r = await fetch(`https://${env.VINTED_HOST}/`, {
-    headers: { cookie, 'user-agent': UA, accept: 'text/html' },
-    signal: AbortSignal.timeout(20000),
+    headers: { cookie, 'user-agent': UA, accept: 'text/html', 'accept-language': 'it-IT,it;q=0.9' },
+    signal: AbortSignal.timeout(25000),
   });
-  const head = (await r.text()).slice(0, 200000);
-  const t = /<meta[^>]+name="csrf-token"[^>]+content="([^"]+)"/.exec(head)?.[1] || '';
-  if (t) await env.KV.put('csrf', t, { expirationTtl: 3600 });
-  return t;
+  if (!r.ok) return '';
+
+  // Stream and stop at the token: buffering 2MB would blow the CPU budget.
+  const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
+  let tail = '', token = '';
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const chunk = tail + value;
+      const m = CSRF_RE.exec(chunk);
+      if (m) { token = m[1]; break; }
+      tail = chunk.slice(-200);
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+  if (token) await env.KV.put('csrf', token, { expirationTtl: 3600 });
+  return token;
 }
 
 export async function vapi(env, path, init = {}) {
@@ -304,7 +326,8 @@ export async function vapi(env, path, init = {}) {
   let body;
   try { body = JSON.parse(text); } catch { body = text.slice(0, 300); }
   if (!r.ok) {
-    const e = new Error(`vinted ${init.method || 'GET'} ${path} -> ${r.status}`);
+    const detail = typeof body === 'string' ? body : JSON.stringify(body);
+    const e = new Error(`vinted ${init.method || 'GET'} ${path} -> ${r.status}: ${detail.slice(0, 220)}`);
     e.status = r.status; e.body = body;
     throw e;
   }
@@ -473,7 +496,24 @@ export async function fetchStats(env, vintedId) {
 }
 
 // Setup helper: confirms the session works and the API shapes above still match.
-export async function probe(env, query) {
+export async function probe(env, query, testPhoto) {
+  let photoTest = null;
+  if (testPhoto) {
+    try {
+      // Use a real stored photo: a 1x1 pixel is rejected by Vinted on its own
+      // merits and tells us nothing about whether the write path works.
+      const key = typeof testPhoto === 'string' && testPhoto.length > 4 ? testPhoto : null;
+      const buf = key ? await env.KV.get('photo:' + key, 'arrayBuffer') : null;
+      if (!buf) throw new Error('nessuna foto reale disponibile per il test');
+      const fd = new FormData();
+      fd.append('photo[type]', 'item');
+      fd.append('photo[file]', new Blob([buf], { type: 'image/jpeg' }), 'probe.jpg');
+      const res = await vapi(env, '/api/v2/photos', { method: 'POST', body: fd });
+      photoTest = { ok: true, id: res.id ?? res.photo?.id ?? null };
+    } catch (e) {
+      photoTest = { ok: false, error: String(e.message).slice(0, 220) };
+    }
+  }
   return (async () => {
     const me = await vapi(env, '/api/v2/users/current').catch((e) => ({ error: String(e.message).slice(0, 120) }));
     const comps = await searchComparables(env, query || 'nike felpa', 10);
@@ -484,6 +524,10 @@ export async function probe(env, query) {
       // Posting has never been executed. Until one listing goes up for real,
       // treat createListing/updatePrice as unverified.
       posting_verified: false,
+      csrf_found: Boolean(await csrf(env, await cookieHeader(env)).catch(() => '')),
+      // Uploading to Vinted's temp photo store creates no listing, so this is a
+      // safe way to prove the write path works before publishing anything real.
+      photo_upload: photoTest === null ? 'non testato' : photoTest,
     };
   })();
 }

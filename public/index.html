@@ -377,7 +377,11 @@ function card(i) {
       <div style="flex:1"><label>Marca${nb?' ⚠':''}</label><input id="b${i.id}" value="${esc(i.brand)}" placeholder="—"></div>
       <div style="flex:1"><label>Taglia${ns?' ⚠':''}</label><input id="s${i.id}" value="${esc(i.size)}" placeholder="—"></div>
     </div>
-    ${nb?`<div class="warn">La marca non si legge su un'etichetta nelle foto. Confermala o aggiungi uno scatto dell'etichetta: un marchio non verificabile è la causa n.1 di rimozione.</div>`:''}
+    ${nb?`<div class="warn">Non ho letto la marca su un'etichetta, l'ho dedotta dallo stile.
+      Puoi <b>lasciare vuoto il campo Marca</b> e pubblicare senza: è consentito e toglie ogni
+      rischio. Tienila solo se sei sicuro — un marchio non verificabile è la causa n.1 di rimozione.
+      <button class="sec" style="margin-top:8px;padding:8px 12px;font-size:12px"
+        onclick="document.getElementById('b${i.id}').value='';this.closest('.warn').remove()">Pubblica senza marca</button></div>`:''}
     ${i.needs.includes('vinted')?`<div class="warn">Prezzo stimato senza dati di mercato — Vinted non era collegato. Collegalo e tocca Riprova.</div>`:''}
     ${ns&&!i.size?`<div class="warn">Taglia non trovata. Inseriscila: è il motivo n.1 di resi.</div>`:''}
     <div class="prices">

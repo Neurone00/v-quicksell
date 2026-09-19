@@ -1,8 +1,13 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
-## Quicksell 1.1.0
+## Quicksell 1.2.0
 
-**New in 1.1.0**
+**New in 1.2.0**
+- **Diagnostica** in the popup: on a Vinted listing page it reports which fields it can see and which it can't, and copies a report. Use it if Compila leaves something empty.
+- Per-user keys: the app supports more than one account; each extension install carries one user's key.
+- Popup and panel use the brand faces.
+
+**1.1.0**
 - Price drops run by themselves: daily and on Chrome startup, in a minimized window, one listing every 5–15 s, then a count. No confirmation.
 - The extension checks for new releases daily and offers the update with one click (badge on the icon).
 - Releases are cut automatically when the version changes.

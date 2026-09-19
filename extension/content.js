@@ -157,6 +157,26 @@ async function onLocalPhotos(files) {
   show(`${head('')}L'analisi sta prendendo più del solito. La bozza arriverà nell'app.`);
 }
 
+// --- diagnostics: the popup asks what this page looks like ------------------
+// The first real run is the only way to learn Vinted's form. This makes that
+// run tell us everything at once instead of one missing field at a time.
+chrome.runtime.onMessage.addListener((msg, _s, reply) => {
+  if (msg?.type !== 'diagnose') return;
+  const save = [...document.querySelectorAll('button')].find((el) => /^(salva|aggiorna|conferma|carica|pubblica|salva modifiche)$/i.test(el.textContent.trim()));
+  const report = {
+    url: location.pathname,
+    photos: !!document.querySelector('input[type="file"]'),
+    title: !!find(FIELDS.title), description: !!find(FIELDS.description), price: !!find(FIELDS.price),
+    save: save ? save.textContent.trim() : null,
+    controls: [...document.querySelectorAll('input,textarea,select,button,[role="combobox"]')]
+      .map((el) => [el.tagName.toLowerCase(), el.type || '', el.name || el.id || el.dataset.testid || el.getAttribute('aria-label') || el.placeholder || (el.tagName === 'BUTTON' ? el.textContent.trim().slice(0, 24) : '')].filter(Boolean).join(':'))
+      .filter((c) => c.includes(':') && !/ot-|onetrust|search/i.test(c)).slice(0, 60),
+  };
+  send({ type: 'api', path: '/api/learn', method: 'POST', body: { url: location.pathname, controls: report.controls } });
+  reply(report);
+  return true;
+});
+
 // --- boot --------------------------------------------------------------------
 (async () => {
   await sleep(1500);

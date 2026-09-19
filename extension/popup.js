@@ -24,3 +24,24 @@ async function load() {
   const b = $('#batch');
   if (b) b.onclick = () => { send({ type: 'batch' }); b.textContent = 'Avviato — ti avviso alla fine'; b.disabled = true; };
 }
+
+// Diagnostics: ask the content script on the active Vinted tab what it sees.
+$('#diag').onclick = async () => {
+  const out = $('#diagout');
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab || !/vinted\.it\/items\/(new|\d+\/edit)/.test(tab.url || '')) {
+    out.innerHTML = '<div class="card">Apri prima vinted.it → <b>Vendi</b> (o la modifica di un annuncio) in questa scheda, poi riprova.</div>'; return;
+  }
+  let r; try { r = await chrome.tabs.sendMessage(tab.id, { type: 'diagnose' }); } catch { r = null; }
+  if (!r) { out.innerHTML = '<div class="card">Non riesco a parlare con la pagina. Ricarica la scheda di Vinted e riprova.</div>'; return; }
+  const ok = (v) => v ? '✓' : '✗';
+  const text = `Quicksell diagnostica — ${r.url}
+foto: ${ok(r.photos)}  titolo: ${ok(r.title)}  descrizione: ${ok(r.description)}  prezzo: ${ok(r.price)}  salva: ${r.save || '✗'}
+controlli:
+${r.controls.join('\n')}`;
+  out.innerHTML = `<div class="card"><b>${r.url}</b><br>
+    foto ${ok(r.photos)} · titolo ${ok(r.title)} · descrizione ${ok(r.description)} · prezzo ${ok(r.price)} · pulsante ${r.save ? '"' + r.save + '"' : '✗'}<br>
+    <small>${r.controls.length} controlli visti. Il rapporto è anche nell'app (/api/learned).</small><br>
+    <button id="copyd" style="margin-top:8px">Copia rapporto</button></div>`;
+  $('#copyd').onclick = () => navigator.clipboard.writeText(text).then(() => { $('#copyd').textContent = 'Copiato ✓'; });
+};

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Quicksell per Vinted",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Aggiungi le foto a un nuovo annuncio Vinted: titolo, descrizione e prezzo si compilano da soli. I ribassi sono un click.",
   "permissions": [
     "storage",

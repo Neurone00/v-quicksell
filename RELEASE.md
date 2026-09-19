@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.11
+
+**1.4.11** — le opzioni Vinted sono caselle/radio dentro i menu: ora clicco l’elemento giusto (non la riga), e verifico che il valore sia entrato. Il tasto Diagnostica ora copia anche il DOM dei menu nell’app, così sistemo la selezione con precisione.
+
 ## Quicksell 1.4.10
 
 **1.4.10** — condizioni ora si compila: le etichette vere di Vinted sono “Ottime”/“Buone” (non “Ottime condizioni”). Corretto sia l’AI sia la corrispondenza, comprese le bozze già fatte.

@@ -189,8 +189,20 @@ async function pickInput(input, want, mode, harvestKey) {
   if (!menu) return 'nomenu';
   const hit = optionEls(menu).find((o) => matchOpt(norm(o.textContent), want, mode));
   if (!hit) { closeMenu(); return 'nomatch'; }
-  hit.click(); await sleep2(150); closeMenu();
-  return 'ok';
+  selectOption(hit);
+  await sleep2(200); closeMenu();
+  // confirm it registered (the field input now holds a value); else report failure
+  return input.value.trim() ? 'ok' : 'nomatch';
+}
+// Vinted's options are checkbox/radio rows in a React flyout — click the input
+// (or its label) with a real pointer sequence, not the wrapping div.
+function selectOption(o) {
+  const row = o.closest('label, li, [role="option"]') || o;
+  const inp = (o.matches && o.matches('input')) ? o : row.querySelector('input[type="checkbox"], input[type="radio"], input');
+  const target = row.querySelector('label') || inp || o;
+  for (const t of ['pointerover', 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+    target.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window }));
+  }
 }
 // Snapshot what a field's menu looks like, so a failure is debuggable without guessing.
 async function probe(input) {
@@ -325,22 +337,45 @@ async function onLocalPhotos(files) {
 // --- diagnostics: the popup asks what this page looks like ------------------
 // The first real run is the only way to learn Vinted's form. This makes that
 // run tell us everything at once instead of one missing field at a time.
+// Open each detail dropdown and capture how its flyout + options are built,
+// so the picker can target the exact element Vinted's React listens on.
+async function captureDropdowns() {
+  const out = {};
+  for (const id of ['size', 'condition', 'color', 'material']) {
+    const input = document.getElementById(id);
+    if (!input) continue;
+    const before = new Set(document.querySelectorAll(menuSel));
+    input.focus(); input.click();
+    const menu = await waitMenu(before);
+    if (!menu) { out[id] = { opened: false }; closeMenu(); continue; }
+    const opts = optionEls(menu).slice(0, 6).map((o) => {
+      const row = o.closest('label, li, [role="option"]') || o;
+      const inp = row.querySelector('input');
+      return { tag: o.tagName, cls: (o.className || '').toString().slice(0, 50), text: o.textContent.trim().slice(0, 40), input: inp ? inp.type : null, hasLabel: !!row.querySelector('label') };
+    });
+    out[id] = { opened: true, menuTag: menu.tagName, menuCls: (menu.className || '').toString().slice(0, 60), optionCount: optionEls(menu).length, sample: opts, html: menu.outerHTML.slice(0, 3500) };
+    closeMenu(); document.body.click(); await sleep2(250);
+  }
+  return out;
+}
 chrome.runtime.onMessage.addListener((msg, _s, reply) => {
   if (msg?.type !== 'diagnose') return;
-  const save = [...document.querySelectorAll('button')].find((el) => /^(salva|aggiorna|conferma|carica|pubblica|salva modifiche)$/i.test(el.textContent.trim()));
-  const report = {
-    url: location.pathname,
-    photos: !!document.querySelector('input[type="file"]'),
-    title: !!find(FIELDS.title), description: !!find(FIELDS.description), price: !!find(FIELDS.price),
-    save: save ? save.textContent.trim() : null,
-    priceFound: !!findPrice(),
-    controls: [...document.querySelectorAll('input,textarea,select,[role="combobox"]')]
-      .map((el) => [el.tagName.toLowerCase(), el.type || '', el.name || el.id || el.dataset.testid || '', el.placeholder || '', (el.labels?.[0]?.textContent || el.closest('label')?.textContent || '').trim().slice(0, 20)].map((x) => x.replace(/\s+/g, ' ')).join(' | '))
-      .filter((c) => !/ot-|onetrust|search_text|vendor/i.test(c)).slice(0, 40),
-  };
-  send({ type: 'api', path: '/api/learn', method: 'POST', body: { url: location.pathname, controls: report.controls } });
-  reply(report);
-  return true;
+  (async () => {
+    const save = [...document.querySelectorAll('button')].find((el) => /^(salva|aggiorna|conferma|carica|pubblica|salva modifiche)$/i.test(el.textContent.trim()));
+    const dropdowns = await captureDropdowns();
+    const report = {
+      url: location.pathname,
+      photos: !!document.querySelector('input[type="file"]'),
+      title: !!find(FIELDS.title), description: !!find(FIELDS.description), price: !!findPrice(),
+      save: save ? save.textContent.trim() : null,
+      controls: [...document.querySelectorAll('input,textarea,select,[role="combobox"]')]
+        .map((el) => [el.tagName.toLowerCase(), el.type || '', el.name || el.id || el.dataset.testid || '', el.placeholder || '', (el.labels?.[0]?.textContent || el.closest('label')?.textContent || '').trim().slice(0, 20)].map((x) => x.replace(/\s+/g, ' ')).join(' | '))
+        .filter((c) => !/ot-|onetrust|search_text|vendor/i.test(c)).slice(0, 40),
+    };
+    send({ type: 'api', path: '/api/learn', method: 'POST', body: { url: location.pathname, controls: report.controls, dropdowns } });
+    reply({ ...report, dropdownsSeen: Object.keys(dropdowns).filter((k) => dropdowns[k].opened) });
+  })();
+  return true;   // async reply
 });
 
 // --- boot --------------------------------------------------------------------

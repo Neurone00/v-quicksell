@@ -13,12 +13,37 @@ chrome.storage.sync.get({ appUrl: 'https://v-quicksell.neurone00.workers.dev', s
 async function connection() {
   const r = await send({ type: 'api', path: '/api/status', method: 'GET' });
   const box = $('#conn');
-  if (r.ok) { box.innerHTML = `<small>Collegato come <b>${r.data.user}</b>.</small>`; return true; }
-  const app = (await chrome.storage.sync.get({ appUrl: 'https://v-quicksell.neurone00.workers.dev' })).appUrl;
-  box.innerHTML = /NOT_LOGGED_IN/.test(r.error)
-    ? `Non sei ancora entrato nell'app in questo Chrome.<br><a href="${app}" target="_blank">Apri l'app</a> con il tuo link di accesso, poi riapri questo pannello.`
-    : `Non raggiungo l'app: ${r.error}`;
+  if (r.ok) { box.innerHTML = `<small>Account attivo: <b>${r.data.user}</b>.</small>`; connectPhone(); return true; }
+  // No account on this device yet: create one right here, one click.
+  box.innerHTML = `<b>Crea il tuo account</b><br>
+    <small>Un click. Niente email, niente password: l'account vive in questa estensione e sul telefono che colleghi.</small><br>
+    <button id="enroll" class="big" style="width:100%;margin-top:8px">Crea account</button>
+    <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">Ho già un account</summary>
+      <small>Apri l'app in questo Chrome col tuo link di accesso, oppure incolla la chiave in Avanzate.</small></details>`;
+  const btn = document.getElementById('enroll');
+  btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = 'Creo…';
+    const e = await send({ type: 'enroll' });
+    if (!e.ok || !e.data?.key) { btn.disabled = false; btn.textContent = 'Riprova'; box.insertAdjacentHTML('beforeend', `<div class="card" style="margin-top:8px">Non riuscito: ${e.error || e.data?.error || 'errore'}</div>`); return; }
+    load();
+  };
   return false;
+}
+
+// Show a QR + link so the phone joins the same account.
+async function connectPhone() {
+  const { appUrl, secret } = await chrome.storage.sync.get({ appUrl: DEFAULT_APP_URL, secret: '' });
+  const box = document.getElementById('phone');
+  if (!box) return;
+  if (!secret) { box.innerHTML = ''; return; }   // owner-key instance: nothing to hand out
+  const link = `${appUrl}/?k=${secret}`;
+  let img = '';
+  try { const q = qrcode(0, 'M'); q.addData(link); q.make(); img = `<div class="qr"><img src="${q.createDataURL(4, 0)}" alt="QR"></div>`; } catch {}
+  box.innerHTML = `<div class="card"><b>Collega il telefono</b><br>
+    <small>Inquadra il QR col telefono (o apri il link): entra nello stesso account.</small><br>
+    ${img}
+    <button class="big" id="cpl" style="width:100%">Copia link</button></div>`;
+  document.getElementById('cpl').onclick = () => navigator.clipboard.writeText(link).then(() => { document.getElementById('cpl').textContent = 'Copiato ✓'; });
 }
 $('#save').onclick = () => chrome.storage.sync.set({ appUrl: $('#appUrl').value.trim().replace(/\/$/, ''), secret: $('#secret').value.trim() }, () => { $('#st').textContent = 'Salvato'; load(); });
 

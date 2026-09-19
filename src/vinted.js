@@ -1,478 +1,20 @@
-// Everything that touches Vinted. One file on purpose: when Vinted changes
-// something, or Cloudflare's IPs get blocked and this has to move to a local
-// runner on your Mac, this is the only file that changes.
-//
-// Strategy: drive a REAL browser (Browser Rendering) for the fingerprint and
-// the Datadome cookie, but make the actual calls against Vinted's own JSON API
-// from inside the page. Browser = credibility, API = no brittle DOM selectors.
-import puppeteer from '@cloudflare/puppeteer';
+// Everything that touches Vinted. All of it is anonymous reads of public pages:
+// no session, no writes, nothing for Vinted to ban. Writes are the human's.
 
-const SESSION_KEY = 'vinted_session';
-
-// ---------------------------------------------------------------------------
-// Session
-// ---------------------------------------------------------------------------
-
-// You paste your cookie string once (see README). We never see your password.
-export async function saveSession(env, cookieString) {
-  const cookies = parseCookieString(cookieString, env.VINTED_HOST);
-  if (!cookies.find((c) => /session|access_token/.test(c.name))) {
-    // Almost always means document.cookie was used: Vinted's session cookies are
-    // HttpOnly, so JS cannot read them and the paste arrives without the only
-    // part that matters. Say that, rather than a generic failure.
-    throw new Error(
-      `Ricevuti ${cookies.length} cookie, ma nessuno di sessione. ` +
-      'Probabilmente hai usato document.cookie nella Console: i cookie di sessione ' +
-      'di Vinted sono HttpOnly e Javascript non li vede. Prendili dalla scheda Rete: ' +
-      'ricarica vinted.it, clicca la prima richiesta e copia l\'intestazione "Cookie:".'
-    );
-  }
-  await env.KV.put(SESSION_KEY, JSON.stringify(cookies));
-  return cookies.length;
-}
-
-// Interactive login: we drive a real browser, stream it to the phone as
-// screenshots, and relay taps and typing back. The user signs in however they
-// normally do — Google, Apple, password — and we keep only the resulting
-// cookies. This exists because most Vinted accounts are social logins with no
-// password at all, and because a human can answer a captcha or an emailed code
-// where automation cannot (and should not).
-//
-// Costs real browser minutes: the Free plan allows ~10/day, and a login takes
-// two or three. It is a one-time action.
-
-// Installed before any page script and re-installed on every navigation, so it
-// records what the real site calls — the only reliable way to learn endpoints
-// that are not documented anywhere and that we have already seen move.
-const SNIFFER = () => {
-  window.__vqLog = window.__vqLog || [];
-  const keep = (e) => { if (window.__vqLog.length < 200) window.__vqLog.push(e); };
-  const body = (b) => {
-    try {
-      if (!b) return null;
-      if (typeof b === 'string') return b.slice(0, 400);
-      if (b instanceof FormData) return '[FormData ' + [...b.keys()].join(',') + ']';
-      return '[' + (b.constructor && b.constructor.name) + ']';
-    } catch { return null; }
-  };
-  const of = window.fetch;
-  window.fetch = async function (...a) {
-    const url = typeof a[0] === 'string' ? a[0] : (a[0] && a[0].url) || '';
-    const method = (a[1] && a[1].method) || (a[0] && a[0].method) || 'GET';
-    const r = await of.apply(this, a);
-    try { if (/\/api\//.test(url)) keep({ method, url, status: r.status, body: body(a[1] && a[1].body) }); } catch {}
-    return r;
-  };
-  const oo = XMLHttpRequest.prototype.open;
-  XMLHttpRequest.prototype.open = function (m, u) { this.__vq = { m, u }; return oo.apply(this, arguments); };
-  const os = XMLHttpRequest.prototype.send;
-  XMLHttpRequest.prototype.send = function (b) {
-    const self = this;
-    this.addEventListener('load', () => {
-      try { if (self.__vq && /\/api\//.test(self.__vq.u))
-        keep({ method: self.__vq.m, url: self.__vq.u, status: self.status, body: body(b) }); } catch {}
-    });
-    return os.apply(this, arguments);
-  };
-};
-
-// On reconnect, pages()[0] can be a leftover about:blank — pick the real one.
-async function livePage(browser) {
-  const pages = await browser.pages();
-  return pages.find((p) => p.url() && p.url() !== 'about:blank') || pages[0];
-}
-
-async function snap(page) {
-  const raw = await page.screenshot({ type: 'jpeg', quality: 55 });
-  const vp = page.viewport() || { width: 400, height: 780 };
-  let b64;
-  if (typeof raw === 'string') b64 = raw;
-  else {
-    const u = new Uint8Array(raw);
-    let str = '';
-    for (let i = 0; i < u.length; i += 0x8000) str += String.fromCharCode(...u.subarray(i, i + 0x8000));
-    b64 = btoa(str);
-  }
-  return { shot: b64, w: vp.width, h: vp.height };
-}
-
-// Ask the server, do not read the page. Two false positives made the earlier
-// text check useless: the "Iscriviti | Accedi" label is behind a hamburger on
-// mobile, and Vinted hands anonymous visitors a _vinted_fr_session cookie too —
-// so "has a session cookie" is not "is logged in". /api/v2/users/current
-// answers 200 authenticated and 403 anonymous, which is the real signal.
-// Decline non-essential cookies on the user's behalf. Otherwise the consent
-// wall is the first thing they have to fight through by hand, and re-navigating
-// brings it straight back — which is what produced the "cookie loop".
-async function dismissConsent(page) {
-  const clicked = await page.evaluate(() => {
-    const reject = /accetta solo necessari|solo necessari|rifiuta tutt|reject all/i;
-    const b = [...document.querySelectorAll('button,a')]
-      .find((e) => reject.test((e.textContent || '').trim()));
-    if (b) { b.click(); return true; }
-    return false;
-  }).catch(() => false);
-  if (clicked) await new Promise((r) => setTimeout(r, 900));
-  return clicked;
-}
-
-async function loggedIn(page) {
-  return page.evaluate(async () => {
-    try {
-      const r = await fetch('/api/v2/users/current', {
-        credentials: 'include', headers: { accept: 'application/json' },
-      });
-      return r.status === 200;
-    } catch { return false; }
-  });
-}
-
-// Free plan: ~3 concurrent browsers and ~10 minutes a day. Launching a fresh
-// one per attempt while leaving the old alive on keep_alive burns the quota in
-// a handful of tries, which is exactly what happened. Reuse an idle session.
-export async function browserStart(env) {
-  let browser = null;
-  for (const sess of await puppeteer.sessions(env.BROWSER).catch(() => [])) {
-    if (sess.connectionId) continue;                 // in use by another request
-    browser = await puppeteer.connect(env.BROWSER, sess.sessionId).catch(() => null);
-    if (browser) break;
-  }
-  if (!browser) {
-    try {
-      browser = await puppeteer.launch(env.BROWSER, { keep_alive: 180000 });
-    } catch (e) {
-      if (/429|rate limit/i.test(String(e.message))) {
-        const lim = await puppeteer.limits(env.BROWSER).catch(() => null);
-        throw new Error(`BROWSER_LIMIT:${lim?.timeUntilNextAllowedBrowserAcquisition ?? 0}`);
-      }
-      throw e;
-    }
-  }
-  const sessionId = browser.sessionId();
-  const page = (await livePage(browser)) || (await browser.newPage());
-  await page.setViewport({ width: 400, height: 760, deviceScaleFactor: 1 });
-  await page.evaluateOnNewDocument(SNIFFER).catch(() => {});
-
-  // Land on the sign-in screen, not the homepage — there is nothing to do on
-  // the homepage but hunt for the login button. ref_url sends Vinted to the
-  // new-listing page afterwards, which is also where we want the session proved.
-  //
-  // Always navigate here: "Collega" means start the sign-in, and a reused
-  // session would otherwise strand the user wherever it was left. The cookie
-  // loop this once caused is gone now that consent is declined automatically
-  // rather than re-asked on every load.
-  await page.goto(`https://${env.VINTED_HOST}${env.LOGIN_PATH}`,
-    { waitUntil: 'domcontentloaded', timeout: 45000 });
-  await dismissConsent(page);
-
-  const out = { sessionId, ...(await snap(page)) };
-  await browser.disconnect();   // disconnect, not close — the session stays warm
-  return out;
-}
-
-export async function browserAct(env, sessionId, act) {
-  const browser = await puppeteer.connect(env.BROWSER, sessionId);
-  try {
-    const page = await livePage(browser);
-    if (!page) throw new Error('SESSION_GONE');
-    await page.setViewport({ width: 400, height: 760, deviceScaleFactor: 1 });
-
-    if (act.type === 'click') await page.mouse.click(act.x, act.y);
-    else if (act.type === 'text') await page.keyboard.type(String(act.text), { delay: 25 });
-    else if (act.type === 'key') await page.keyboard.press(act.key || 'Enter');
-    else if (act.type === 'scroll') await page.evaluate((d) => window.scrollBy(0, d), act.dy || 400);
-    else if (act.type === 'back') await page.goBack({ timeout: 15000 }).catch(() => {});
-
-    // Give the page a beat to react; clicks may navigate.
-    await new Promise((r) => setTimeout(r, act.type === 'click' || act.type === 'key' ? 1600 : 500));
-    await dismissConsent(page);   // it can reappear after a navigation
-
-    if (await loggedIn(page)) {
-      const cookies = await page.cookies();
-      if (cookies.find((c) => /session|access_token/.test(c.name))) {
-        await env.KV.put(SESSION_KEY, JSON.stringify(cookies));
-        const log = await page.evaluate(() => window.__vqLog || []).catch(() => []);
-        await browser.close();          // done with it — free the minutes
-        return { done: true, cookies: cookies.length, log };
-      }
-    }
-    const log = await page.evaluate(() => {
-      const l = window.__vqLog || [];
-      window.__vqLog = [];
-      return l;
-    }).catch(() => []);
-    return { done: false, log, ...(await snap(page)) };
-  } finally {
-    await browser.disconnect().catch(() => {});
-  }
-}
-
-// Writes from plain fetch get a Datadome captcha; the same request from inside
-// a real browser page does not. This runs one API call in a browser session so
-// we can tell the two apart before committing the architecture either way.
-export async function apiInBrowser(env, path, init = {}) {
-  const cookies = JSON.parse((await env.KV.get(SESSION_KEY)) || 'null');
-  if (!cookies) throw new Error('NO_SESSION');
-  const browser = await puppeteer.launch(env.BROWSER, { keep_alive: 60000 });
-  try {
-    const page = await browser.newPage();
-    await page.setCookie(...cookies);
-    await page.goto(`https://${env.VINTED_HOST}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
-    return await page.evaluate(async (path, init) => {
-      const token = /CSRF_TOKEN[\\"\s:]+([0-9a-f-]{36})/.exec(document.documentElement.innerHTML || '');
-      const r = await fetch(path, {
-        method: init.method || 'GET',
-        credentials: 'include',
-        headers: {
-          accept: 'application/json, text/plain, */*',
-          ...(token ? { 'x-csrf-token': token[1] } : {}),
-          ...(init.json ? { 'content-type': 'application/json' } : {}),
-        },
-        body: init.json ? JSON.stringify(init.json) : undefined,
-      });
-      const text = await r.text();
-      let body; try { body = JSON.parse(text); } catch { body = text.slice(0, 300); }
-      return { status: r.status, body, csrf: Boolean(token) };
-    }, path, init);
-  } finally {
-    await browser.close();
-  }
-}
-
-export async function browserStop(env, sessionId) {
-  const browser = await puppeteer.connect(env.BROWSER, sessionId).catch(() => null);
-  if (browser) await browser.close().catch(() => {});
-  return { ok: true };
-}
-
-// Diagnostics and recovery: see what is holding the quota, and hand it back.
-export async function browserStatus(env) {
-  const [sessions, limits] = await Promise.all([
-    puppeteer.sessions(env.BROWSER).catch((e) => ({ error: String(e.message).slice(0, 120) })),
-    puppeteer.limits(env.BROWSER).catch((e) => ({ error: String(e.message).slice(0, 120) })),
-  ]);
-  return { sessions, limits };
-}
-
-export async function browserReap(env) {
-  let closed = 0;
-  for (const sess of await puppeteer.sessions(env.BROWSER).catch(() => [])) {
-    if (sess.connectionId) continue;
-    const b = await puppeteer.connect(env.BROWSER, sess.sessionId).catch(() => null);
-    if (b) { await b.close().catch(() => {}); closed++; }
-  }
-  return { closed };
-}
-
-export async function hasSession(env) {
-  return !!(await loadJar(env));
-}
-
-function parseCookieString(s, host) {
-  const domain = '.' + host.replace(/^www\./, '');
-  return s
-    .split(';')
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map((p) => {
-      const i = p.indexOf('=');
-      return { name: p.slice(0, i).trim(), value: p.slice(i + 1).trim(), domain, path: '/' };
-    })
-    .filter((c) => c.name && c.value);
-}
-
-// ---------------------------------------------------------------------------
-// Browser session. Free plan gives ~10 browser-minutes/day, so every caller
-// gets ONE browser and does all its work inside a single open().
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// The API, over plain fetch, using the cookies the login captured.
-//
-// The browser is for LOGGING IN. Once we hold a session, Vinted is reachable
-// from the Worker directly — the catalog page already proved a Worker IP is not
-// blocked — so posting and price updates should cost no browser time either.
-// ---------------------------------------------------------------------------
-
-// The jar lives in KV because refresh rotates it. VINTED_COOKIE (a Wrangler
-// secret) only seeds it: set once from a terminal, hidden prompt, never chat.
-async function loadJar(env) {
-  let jar = JSON.parse((await env.KV.get(SESSION_KEY)) || 'null');
-  if (!jar && env.VINTED_COOKIE) {
-    jar = parseCookieString(env.VINTED_COOKIE, env.VINTED_HOST);
-    if (jar.find((c) => /session|access_token/.test(c.name))) {
-      await env.KV.put(SESSION_KEY, JSON.stringify(jar));
-    } else jar = null;
-  }
-  return jar;
-}
-
-async function cookieHeader(env) {
-  const jar = await loadJar(env);
-  if (!jar) throw new Error('NO_SESSION');
-  return jar.map((c) => `${c.name}=${c.value}`).join('; ');
-}
-
-// Called daily by the cron and on every app open. The refresh token lasts seven
-// days and each refresh issues a new one, so touching it daily keeps the session
-// alive forever. Returns what the UI needs to say if it cannot.
-export async function keepalive(env) {
-  let cookie;
-  try { cookie = await cookieHeader(env); } catch { return { alive: false, reason: 'NO_SESSION' }; }
-  const ref = /refresh_token_web=([^;]+)/.exec(cookie)?.[1];
-  const exp = ref ? jwtExp(ref) : null;
-  const daysLeft = exp ? (exp - Date.now() / 1000) / 86400 : 0;
-  if (daysLeft <= 0) { await env.KV.delete(SESSION_KEY); return { alive: false, reason: 'SESSION_EXPIRED' }; }
-  // Refresh when the access token is stale or the refresh token is under 5 days.
-  if (accessExpired(cookie) || daysLeft < 5) {
-    try { await refreshSession(env); }
-    catch { await env.KV.delete(SESSION_KEY); return { alive: false, reason: 'SESSION_EXPIRED' }; }
-  }
-  return { alive: true };
-}
-
-// Vinted wants a CSRF token on writes. It is NOT a <meta> tag — it lives in the
-// Next.js config blob as "CSRF_TOKEN":"<uuid>", about 300KB into a 2MB page.
-// Both of those caught me out: the meta selector never matched, and the first
-// 200KB I used to read would have missed it anyway. Every write was going out
-// with an empty token, which is what Vinted answered 403 to.
-const CSRF_RE = /CSRF_TOKEN[\\"\s:]+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/;
-
-async function csrf(env, cookie) {
-  const cached = await env.KV.get('csrf');
-  if (cached) return cached;
-
-  const r = await fetch(`https://${env.VINTED_HOST}/`, {
-    headers: { cookie, 'user-agent': UA, accept: 'text/html', 'accept-language': 'it-IT,it;q=0.9' },
-    signal: AbortSignal.timeout(25000),
-  });
-  if (!r.ok) return '';
-
-  // Stream and stop at the token: buffering 2MB would blow the CPU budget.
-  const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
-  let tail = '', token = '';
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      const chunk = tail + value;
-      const m = CSRF_RE.exec(chunk);
-      if (m) { token = m[1]; break; }
-      tail = chunk.slice(-200);
-    }
-  } finally {
-    await reader.cancel().catch(() => {});
-  }
-  if (token) await env.KV.put('csrf', token, { expirationTtl: 3600 });
-  return token;
-}
-
-// Vinted's access token lasts two hours; the refresh token seven days. Without
-// this the app works for one sitting and is dead by the next daily cron.
-// /web/api/auth/refresh is the endpoint that returns a fresh Set-Cookie.
-async function refreshSession(env) {
-  const cookie = await cookieHeader(env);
-  const r = await fetch(`https://${env.VINTED_HOST}/web/api/auth/refresh`, {
-    method: 'POST',
-    headers: {
-      cookie, 'user-agent': UA, accept: 'application/json, text/plain, */*',
-      referer: `https://${env.VINTED_HOST}/`, 'x-csrf-token': await csrf(env, cookie),
-    },
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!r.ok) throw new Error('SESSION_EXPIRED');
-
-  const jar = JSON.parse((await env.KV.get(SESSION_KEY)) || '[]');
-  const domain = '.' + env.VINTED_HOST.replace(/^www\./, '');
-  const setCookies = typeof r.headers.getSetCookie === 'function'
-    ? r.headers.getSetCookie()
-    : [r.headers.get('set-cookie')].filter(Boolean);
-  for (const sc of setCookies) {
-    const pair = sc.split(';')[0];
-    const i = pair.indexOf('=');
-    if (i < 1) continue;
-    const name = pair.slice(0, i).trim(), value = pair.slice(i + 1).trim();
-    const found = jar.find((c) => c.name === name);
-    if (found) found.value = value;
-    else jar.push({ name, value, domain, path: '/' });
-  }
-  await env.KV.put(SESSION_KEY, JSON.stringify(jar));
-  await env.KV.delete('csrf');   // a new session deserves a fresh token
-  return true;
-}
-
-const jwtExp = (jwt) => {
-  try { return JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp; } catch { return null; }
-};
-
-// Cheap pre-flight: the JWT carries its own expiry, so a doomed call can be
-// avoided rather than spent discovering it is doomed.
-function accessExpired(cookie) {
-  const jwt = /access_token_web=([^;]+)/.exec(cookie)?.[1];
-  if (!jwt) return true;
-  try {
-    const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-    return !payload.exp || payload.exp - 60 < Math.floor(Date.now() / 1000);
-  } catch { return false; }
-}
-
-export async function vapi(env, path, init = {}, retried = false) {
-  let cookie = await cookieHeader(env);
-  if (!retried && accessExpired(cookie)) {
-    await refreshSession(env).catch(() => {});
-    cookie = await cookieHeader(env);
-  }
-  const write = init.method && init.method !== 'GET';
-  const r = await fetch(`https://${env.VINTED_HOST}${path}`, {
-    method: init.method || 'GET',
-    headers: {
-      cookie,
-      'user-agent': UA,
-      accept: 'application/json, text/plain, */*',
-      'accept-language': 'it-IT,it;q=0.9',
-      referer: `https://${env.VINTED_HOST}/`,
-      ...(write ? { 'x-csrf-token': await csrf(env, cookie) } : {}),
-      ...(init.json ? { 'content-type': 'application/json' } : {}),
-      ...(init.headers || {}),
-    },
-    body: init.json ? JSON.stringify(init.json) : init.body,
-    signal: AbortSignal.timeout(30000),
-  });
-  // A 401 we did not predict: refresh once and try again before giving up.
-  if (r.status === 401 && !retried) {
-    await refreshSession(env);
-    return vapi(env, path, init, true);
-  }
-
-  const text = await r.text();
-  let body;
-  try { body = JSON.parse(text); } catch { body = text.slice(0, 300); }
-  if (!r.ok) {
-    const detail = typeof body === 'string' ? body : JSON.stringify(body);
-    const e = new Error(`vinted ${init.method || 'GET'} ${path} -> ${r.status}: ${detail.slice(0, 220)}`);
-    e.status = r.status; e.body = body;
-    throw e;
-  }
-  return body;
-}
-
-// Comparables without a browser at all.
-//
-// The catalog page answers a plain fetch with 200 and renders every item's data
-// into a title attribute. Browser Rendering is the scarce resource here — the
-// Free plan allows ~10 minutes a DAY — so spending two seconds of it per
-// analysis was the wrong trade. This costs none.
-//
-// The page is ~7MB and Free Workers get 10ms of CPU, so we stream it and stop
-// as soon as we have enough, instead of buffering and scanning the lot.
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+const HEADERS = { 'user-agent': UA, accept: 'text/html,application/xhtml+xml', 'accept-language': 'it-IT,it;q=0.9' };
+
+// ---------------------------------------------------------------------------
+// Comparables. The catalog page renders each item's data into a title
+// attribute: "Felpa nike, Brand: Nike, Condizioni: Ottime, Taglia: M, 38.00 €, 40.60 €".
+// ~7MB and Free Workers get 10ms CPU, so stream and stop early.
+// ---------------------------------------------------------------------------
 const TITLE_RE = /title="([^"]*Brand:[^"]*)"/g;
 
 function parseTitle(t) {
   const txt = t.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-  // Two prices are shown: the ask, then the ask plus buyer protection. The
-  // second would inflate every estimate, so take the first.
+  // Two prices: the ask, then ask plus buyer protection. Take the ask.
   const prices = [...txt.matchAll(/(\d+[.,]\d{2})\s*€/g)].map((m) => parseFloat(m[1].replace(',', '.')));
   if (!prices.length) return null;
   return {
@@ -481,162 +23,59 @@ function parseTitle(t) {
     condition: (/,\s*Condizioni:\s*([^,]+)/.exec(txt) || [])[1]?.trim() || null,
     size: (/,\s*Taglia:\s*([^,]+)/.exec(txt) || [])[1]?.trim() || null,
     price: prices[0],
-    sold: false,   // search excludes sold items; all of these are active asks
+    sold: false, // search excludes sold items; these are all active asks
   };
 }
 
-export async function searchComparables(env, query, want = 60) {
-  const r = await fetch(
-    `https://${env.VINTED_HOST}/catalog?search_text=${encodeURIComponent(query)}`,
-    {
-      headers: {
-        'user-agent': UA,
-        accept: 'text/html,application/xhtml+xml',
-        'accept-language': 'it-IT,it;q=0.9',
-      },
-      signal: AbortSignal.timeout(25000),
-    }
-  );
-  if (!r.ok) throw new Error(`catalog ${r.status}`);
-
+async function streamFind(url, re, onMatch, want) {
+  const r = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(25000) });
+  if (!r.ok) throw new Error(`vinted ${r.status}`);
   const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
-  const out = [];
-  const seen = new Set();
-  let tail = '';
+  let tail = '', found = 0;
   try {
-    while (out.length < want) {
+    while (found < want) {
       const { value, done } = await reader.read();
       if (done) break;
       const chunk = tail + value;
-      TITLE_RE.lastIndex = 0;
+      re.lastIndex = 0;
       let m;
-      while ((m = TITLE_RE.exec(chunk))) {
-        const c = parseTitle(m[1]);
-        if (c && !seen.has(m[1])) { seen.add(m[1]); out.push(c); }
-      }
-      // keep a small overlap so a title split across chunks still matches
+      while ((m = re.exec(chunk)) && found < want) if (onMatch(m)) found++;
       tail = chunk.slice(-2000);
     }
   } finally {
-    await reader.cancel().catch(() => {});   // stop the download early
+    await reader.cancel().catch(() => {});
   }
+  return found;
+}
+
+export async function searchComparables(env, query, want = 60) {
+  const out = [], seen = new Set();
+  await streamFind(
+    `https://${env.VINTED_HOST}/catalog?search_text=${encodeURIComponent(query)}`,
+    TITLE_RE,
+    (m) => { if (seen.has(m[1])) return false; seen.add(m[1]); const c = parseTitle(m[1]); if (c) out.push(c); return !!c; },
+    want
+  );
   return out;
 }
 
-// ponytail: returns null for now. The endpoint it used is gone, and the
-// category is only needed at posting time — which is itself unverified. The
-// approval card shows the gap rather than guessing a wrong category.
-export async function findCategory() {
-  return null;
-}
-
-// Datadome lets reads through from a datacenter IP but answers writes with a
-// captcha interstitial. The same request from inside a real browser page is
-// not challenged, so a write tries plain fetch and falls back to a browser.
-const isChallenge = (e) =>
-  e.status === 403 && /captcha-delivery|interstitial/.test(JSON.stringify(e.body || ''));
-
-async function write(env, path, init) {
-  try {
-    return await vapi(env, path, init);
-  } catch (e) {
-    if (!isChallenge(e)) throw e;
-    const r = await apiInBrowser(env, path, init);
-    if (r.status >= 400) {
-      const err = new Error(`vinted ${init.method} ${path} -> ${r.status} (browser): ${JSON.stringify(r.body).slice(0, 220)}`);
-      err.status = r.status; err.body = r.body;
-      throw err;
-    }
-    return r.body;
-  }
-}
-
-// Uploads photos, then creates the listing. No browser:
-// a Worker can POST multipart straight from KV, which is simpler than pulling
-// the images back into a browser page just to upload them again.
-export async function createListing(env, item, photos) {
-  const uploaded = [];
-  for (const [i, buf] of photos.entries()) {
-    const fd = new FormData();
-    fd.append('photo[type]', 'item');
-    fd.append('photo[file]', new Blob([buf], { type: 'image/jpeg' }), `photo${i}.jpg`);
-    const res = await vapi(env, '/api/v2/photos', { method: 'POST', body: fd });
-    uploaded.push(res.id ?? res.photo?.id);
-  }
-
-  const created = await write(env, '/api/v2/items', {
-    method: 'POST',
-    json: {
-      item: {
-        title: item.title,
-        description: item.description,
-        catalog_id: item.category_id,
-        price: String(item.list_price),
-        currency: env.CURRENCY,
-        brand: item.brand || undefined,
-        size_id: item.size_id || undefined,
-        status_id: item.status_id || undefined,
-        assigned_photos: uploaded.map((id, i) => ({ id, orientation: 0, position: i })),
-      },
-      feedback_id: null,
-      push_up: false,
-    },
-  });
-  return String(created.item?.id ?? created.id);
-}
-
-export async function updatePrice(env, vintedId, price) {
-  await write(env, `/api/v2/items/${vintedId}`, {
-    method: 'PUT',
-    json: { item: { price: String(price) } },
-  });
-}
-
-// Views/favourites/sold status for items we've listed.
-// /api/v2/items/{id} is deprecated — /details is the current one.
-export async function fetchStats(env, vintedId) {
-  const r = await vapi(env, `/api/v2/items/${vintedId}/details`);
-  const it = r.item || r;
+// ---------------------------------------------------------------------------
+// Tracking a listing the human published: its public page carries favourites,
+// views, price and a Venduto badge. No login involved.
+// ---------------------------------------------------------------------------
+export async function trackItem(env, vintedUrl) {
+  const r = await fetch(vintedUrl, { headers: HEADERS, redirect: 'follow', signal: AbortSignal.timeout(25000) });
+  if (r.status === 404 || r.status === 410) return { gone: true };
+  if (!r.ok) throw new Error(`vinted ${r.status}`);
+  const html = await r.text();
+  const num = (re) => { const m = re.exec(html); return m ? Number(m[1]) : null; };
   return {
-    views: it.view_count ?? 0,
-    favourites: it.favourite_count ?? 0,
-    sold: Boolean(it.is_sold ?? it.is_closed ?? false),
-    price: Number(it.price?.amount ?? it.price ?? 0),
+    gone: false,
+    favourites: num(/favourite_count\\?"?\s*:\s*\\?"?(\d+)/) ?? num(/(\d+)\s*preferit/i),
+    views: num(/view_count\\?"?\s*:\s*\\?"?(\d+)/) ?? num(/(\d+)\s*visualizzazion/i),
+    sold: />Venduto</.test(html) || /is_closed\\?"?\s*:\s*\\?"?true/.test(html),
+    price: (() => { const m = /"price"\\?\s*:\s*\\?"?\{?\\?"?amount\\?"?\s*:\s*\\?"?([\d.]+)/.exec(html); return m ? parseFloat(m[1]) : null; })(),
   };
 }
 
-export async function probe(env, query, testPhoto) {
-  let photoTest = null;
-  if (testPhoto) {
-    try {
-      // Use a real stored photo: a 1x1 pixel is rejected by Vinted on its own
-      // merits and tells us nothing about whether the write path works.
-      const key = typeof testPhoto === 'string' && testPhoto.length > 4 ? testPhoto : null;
-      const buf = key ? await env.KV.get('photo:' + key, 'arrayBuffer') : null;
-      if (!buf) throw new Error('nessuna foto reale disponibile per il test');
-      const fd = new FormData();
-      fd.append('photo[type]', 'item');
-      fd.append('photo[file]', new Blob([buf], { type: 'image/jpeg' }), 'probe.jpg');
-      const res = await vapi(env, '/api/v2/photos', { method: 'POST', body: fd });
-      photoTest = { ok: true, id: res.id ?? res.photo?.id ?? null };
-    } catch (e) {
-      photoTest = { ok: false, error: String(e.message).slice(0, 220) };
-    }
-  }
-  return (async () => {
-    const me = await vapi(env, '/api/v2/users/current').catch((e) => ({ error: String(e.message).slice(0, 120) }));
-    const comps = await searchComparables(env, query || 'nike felpa', 10);
-    return {
-      user: me.user?.login || me.login || me.error || '(sconosciuto)',
-      comparables_found: comps.length,
-      comparables_sample: comps.slice(0, 3),
-      // Posting has never been executed. Until one listing goes up for real,
-      // treat createListing/updatePrice as unverified.
-      posting_verified: false,
-      csrf_found: Boolean(await csrf(env, await cookieHeader(env)).catch(() => '')),
-      // Uploading to Vinted's temp photo store creates no listing, so this is a
-      // safe way to prove the write path works before publishing anything real.
-      photo_upload: photoTest === null ? 'non testato' : photoTest,
-    };
-  })();
-}
+export const vintedIdFromUrl = (u) => (/\/items\/(\d+)/.exec(u || '') || [])[1] || null;

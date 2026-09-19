@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8">
+<style>
+body{width:320px;margin:0;padding:14px;font:14px/1.5 Inter,system-ui,sans-serif;color:#15191A;background:#EDF2F2}
+h1{font:600 18px Georgia,serif;color:#007782;margin:0 0 10px}
+input{width:100%;box-sizing:border-box;padding:9px 11px;border:1.5px solid #D8DCDC;border-radius:10px;margin:4px 0 8px;font:inherit}
+button{background:#007782;color:#fff;border:0;border-radius:99px;padding:9px 14px;font:600 13px Inter,system-ui;cursor:pointer}
+.card{background:#fff;border-radius:12px;padding:10px 12px;margin:8px 0;font-size:13px}
+.card a{color:#007782;font-weight:600;text-decoration:none}
+small{color:#5A6566}
+</style>
+<h1>Quicksell</h1>
+<div id="setup">
+  <label>Indirizzo dell'app</label><input id="appUrl" placeholder="https://v-quicksell….workers.dev">
+  <label>Chiave</label><input id="secret" type="password" placeholder="la chiave dopo ?k=">
+  <button id="save">Salva</button> <small id="st"></small>
+</div>
+<div id="due"></div>
+<script src="popup.js"></script>

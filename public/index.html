@@ -27,16 +27,15 @@
 body{margin:0;background:var(--page);color:var(--ink);
   font:400 15px/1.55 Inter,-apple-system,system-ui,sans-serif;
   padding:0 0 108px;-webkit-font-smoothing:antialiased}
-
 header{position:sticky;top:0;z-index:20;background:var(--page);
   padding:calc(16px + env(safe-area-inset-top)) 20px 14px;display:flex;align-items:baseline;gap:10px}
 h1{font:600 25px/1 Fraunces,Georgia,serif;font-variation-settings:'SOFT' 60;
   margin:0;flex:1;color:var(--calypso);letter-spacing:-.01em}
 .v{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.gear{padding:7px 11px;font-size:15px;line-height:1;border-radius:99px}
 main{padding:0 20px;max-width:640px;margin:0 auto}
 
-/* The Kiln "flowing line": one continuous thread down the whole journey,
-   picking up each item's colour as it passes. */
+/* The Kiln "flowing line": one thread down the whole journey. */
 #list{position:relative;padding-left:26px}
 #list:before{content:'';position:absolute;left:5px;top:10px;bottom:10px;width:2px;border-radius:2px;
   background:linear-gradient(180deg,var(--calypso),var(--mint) 55%,var(--line));opacity:.5}
@@ -48,13 +47,14 @@ main{padding:0 20px;max-width:640px;margin:0 auto}
 #list .card:before{content:'';position:absolute;left:-25px;top:24px;width:12px;height:12px;border-radius:50%;
   background:var(--dot,var(--muted));box-shadow:0 0 0 4px var(--page)}
 .card[data-s=pending]{--dot:var(--calypso)} .card[data-s=needs_input]{--dot:var(--warn)}
-.card[data-s=live]{--dot:var(--mint)} .card[data-s=sold]{--dot:var(--mint)}
-.card[data-s=error]{--dot:var(--bad)}
+.card[data-s=ready]{--dot:var(--calypso)} .card[data-s=live]{--dot:var(--mint)}
+.card[data-s=sold]{--dot:var(--mint)} .card[data-s=error]{--dot:var(--bad)}
+.card.due{box-shadow:inset 0 0 0 1.5px var(--warn),0 8px 24px -14px rgba(21,25,26,.28)}
 
 .row{display:flex;gap:10px;align-items:center}
 .badge{font:600 11px/1 Inter;letter-spacing:.06em;text-transform:uppercase;padding:6px 10px;border-radius:99px;
   background:var(--page);color:var(--muted)}
-.badge.pending{background:color-mix(in srgb,var(--calypso) 13%,transparent);color:var(--calypso)}
+.badge.pending,.badge.ready{background:color-mix(in srgb,var(--calypso) 13%,transparent);color:var(--calypso)}
 .badge.needs_input{background:var(--warn-soft);color:var(--warn)}
 .badge.live,.badge.sold{background:var(--mint-soft);color:var(--mint)}
 .badge.error{background:color-mix(in srgb,var(--bad) 13%,transparent);color:var(--bad)}
@@ -82,8 +82,10 @@ button{background:var(--calypso);color:#fff;border:0;border-radius:99px;padding:
   font:600 15px/1 Inter;cursor:pointer;transition:transform .18s var(--overshoot),filter .18s}
 button:hover{filter:brightness(1.08)} button:active{transform:scale(.96)}
 button.sec{background:transparent;color:var(--muted);box-shadow:inset 0 0 0 1.5px var(--line)}
+button.warn{background:var(--warn);color:#fff}
 button:disabled{opacity:.45;pointer-events:none}
-@media(prefers-color-scheme:dark){button{color:#04211f}}
+@media(prefers-color-scheme:dark){button{color:#04211f}button.warn{color:#1a1206}}
+a.btn{display:inline-block;text-decoration:none;text-align:center}
 
 .fab{position:fixed;left:20px;right:20px;bottom:calc(20px + env(safe-area-inset-bottom));
   max-width:600px;margin:0 auto;padding:17px;font-size:16px;z-index:30;
@@ -96,118 +98,63 @@ button:disabled{opacity:.45;pointer-events:none}
 .prices input{text-align:center;padding:0;border:0;background:transparent;
   font:600 19px/1.2 Inter;font-variant-numeric:tabular-nums;color:var(--calypso)}
 .prices input:focus{background:transparent;border-color:transparent;text-decoration:underline}
-
 .why{font-size:12.5px;color:var(--muted);background:var(--page);border-radius:13px;padding:11px 13px;margin:10px 0;
   border-left:3px solid var(--calypso)}
 .warn{font-size:12.5px;color:var(--warn);background:var(--warn-soft);border-radius:12px;padding:10px 12px;margin:8px 0}
+.hint{font-size:12.5px;color:var(--muted);background:var(--page);border-radius:12px;padding:10px 12px;margin:8px 0}
 details summary{cursor:pointer;font-size:12.5px;color:var(--muted);margin:10px 0;list-style:none}
-details summary:before{content:'▸ ';transition:.2s}
-details[open] summary:before{content:'▾ '}
-.setup{box-shadow:inset 0 0 0 1.5px var(--warn),0 8px 24px -16px rgba(21,25,26,.3)}
+details summary:before{content:'▸ '} details[open] summary:before{content:'▾ '}
 .sp{width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--calypso);
   border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
 @keyframes sp{to{transform:rotate(360deg)}}
 .empty{text-align:center;color:var(--muted);padding:56px 20px;font-size:14px}
 .empty b{display:block;font:600 19px/1.3 Fraunces,Georgia,serif;color:var(--ink);margin-bottom:6px}
-/* Onboarding — one step at a time, then it gets out of the way for good. */
+.empty .illu{display:block;margin:0 auto 18px;opacity:.55}
+code{font:500 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--page);padding:2px 6px;border-radius:6px}
+.toast{position:fixed;left:20px;right:20px;top:calc(72px + env(safe-area-inset-top));max-width:600px;margin:0 auto;
+  background:var(--ink);color:var(--page);border-radius:14px;padding:12px 16px;font-size:13.5px;z-index:40;
+  animation:rise .4s var(--overshoot) both}
+
+/* Continuous-line illustrations: one grid, one stroke weight; draw once, then gesture. */
 .illu{color:var(--calypso);flex:none}
-/* Motion: the stroke writes itself once, then each mark loops the gesture it
-   depicts. One pass of "tratto", then "gesto" forever. */
 @keyframes draw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
 @keyframes swing{0%,55%,100%{transform:rotate(0)}12%{transform:rotate(11deg)}28%{transform:rotate(-8deg)}42%{transform:rotate(4deg)}}
 @keyframes sway{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
-@keyframes snapA{0%,100%{transform:translateX(0)}40%{transform:translateX(-5px)}}
-@keyframes snapB{0%,100%{transform:translateX(0)}40%{transform:translateX(5px)}}
 @keyframes glow{0%,100%{opacity:1}45%{opacity:.45}}
 .illu path{stroke-dasharray:100;animation:draw 1.15s ease-in-out both}
-.illu path:nth-child(2){animation-delay:.16s}
-.illu path:nth-child(3){animation-delay:.32s}
+.illu path:nth-child(2){animation-delay:.16s} .illu path:nth-child(3){animation-delay:.32s}
 .i-bell{animation:swing 3.4s ease-in-out 1.5s infinite;transform-origin:50% 18%}
 .i-hanger{animation:sway 3.6s ease-in-out 1.5s infinite;transform-origin:50% 14%}
-.i-link path:nth-child(1){animation:draw 1.15s ease-in-out both,snapA 2.8s var(--overshoot) 1.5s infinite}
-.i-link path:nth-child(2){animation:draw 1.15s ease-in-out both .16s,snapB 2.8s var(--overshoot) 1.5s infinite}
 .i-check path{animation:draw 1.15s ease-in-out both,glow 2.8s ease-in-out 1.5s infinite}
-@media(prefers-reduced-motion:reduce){
-  .illu,.illu path{animation:none!important;stroke-dasharray:none!important}
-}
-.gear{padding:7px 11px;font-size:15px;line-height:1;border-radius:99px}
-/* Onboarding is a gate, not a banner: nothing behind it is reachable until
-   every step is satisfied. */
-/* Relayed browser: the live Vinted page, driven from the phone. */
-#relay{position:fixed;inset:0;z-index:200;background:var(--ink);display:flex;flex-direction:column;
-  padding:calc(10px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom))}
-#relay[hidden]{display:none}
-.rhelp{color:rgba(255,255,255,.72);font-size:12px;margin:4px 6px 8px;line-height:1.45;flex:none}
-.tapdot{position:fixed;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;
-  border:2px solid var(--calypso);pointer-events:none;z-index:300;animation:tap .45s ease-out forwards}
-@keyframes tap{from{transform:scale(.3);opacity:.9}to{transform:scale(1.5);opacity:0}}
-.rbar{display:flex;gap:8px;align-items:center;padding:8px 2px;flex:none}
-.rbar input{flex:1;background:rgba(255,255,255,.1);color:#fff;border:0;padding:10px 12px;border-radius:10px}
-.rbar button{padding:10px 14px;font-size:14px}
-.rbar .sec{color:#fff;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.28)}
-#rstatus{color:rgba(255,255,255,.7);font-size:12px;flex:1;text-align:right}
-.rview{flex:1;overflow:auto;border-radius:12px;background:#fff;text-align:center}
-#rimg{width:100%;max-width:400px;height:auto;display:inline-block;vertical-align:top;cursor:pointer}
+@media(prefers-reduced-motion:reduce){.illu,.illu path{animation:none!important;stroke-dasharray:none!important}}
+
+/* Onboarding is a gate: nothing behind it is reachable until it is done. */
 #setup.gate{position:fixed;inset:0;z-index:100;background:var(--page);overflow-y:auto;
   display:grid;align-content:center;gap:12px;
   padding:calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom))}
 #setup.gate .card{max-width:560px;margin:0 auto;width:100%}
-body.gated{overflow:hidden}
-body.gated .fab{display:none}
+body.gated{overflow:hidden} body.gated .fab{display:none}
 .onb{padding:22px}
 .onb-h{display:flex;gap:16px;align-items:center;margin-bottom:18px}
 .onb-h h2{margin:0 0 2px}
-.dots{display:flex;gap:6px;margin-bottom:18px}
-.dots i{height:4px;flex:1;border-radius:2px;background:var(--line);transition:background .3s}
-.dots i.now{background:var(--calypso)} .dots i.ok{background:var(--mint)}
-.step{display:flex;gap:12px;align-items:flex-start;padding:11px 0;font-size:14px;color:var(--muted)}
-.step+.step{border-top:1px solid var(--line)}
-.step.done{color:var(--mint)}
-.step.active{color:var(--ink);align-items:flex-start}
-.step.active b{font-weight:600;font-size:15px}
+.step{display:flex;gap:12px;align-items:flex-start;padding:11px 0;font-size:14px;color:var(--ink)}
+.step b{font-weight:600;font-size:15px}
 .tick{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;
-  font:600 12px/1 Inter;background:var(--page);color:var(--muted)}
-.step.done .tick{background:var(--mint-soft);color:var(--mint)}
-.tick.now{background:var(--calypso);color:#fff}
-@media(prefers-color-scheme:dark){.tick.now{color:#04211f}}
-.empty .illu{display:block;margin:0 auto 18px;opacity:.55}
-code{font:500 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
-  background:var(--page);padding:2px 6px;border-radius:6px}
+  font:600 12px/1 Inter;background:var(--calypso);color:#fff}
+@media(prefers-color-scheme:dark){.tick{color:#04211f}}
 </style>
 </head>
 <body>
 <header><h1>Quicksell</h1><span class="v" id="ver"></span>
 <button class="gear sec" id="gear" title="Impostazioni" aria-label="Impostazioni">⚙</button></header>
 <main><div id="setup"></div><div id="list"></div></main>
-<div id="relay" hidden>
-  <p class="rhelp">Questa è la pagina vera di Vinted, aperta dall’app. Tocca dove vuoi:
-    i tocchi arrivano al browser. Per scrivere, tocca prima il campo sulla pagina.</p>
-  <div class="rview"><img id="rimg" onclick="relayClick(event)" alt="Vinted"></div>
-  <div class="rbar">
-    <button class="sec" onclick="relayAct({type:'back'})" aria-label="Indietro">←</button>
-    <button class="sec" onclick="relayAct({type:'scroll',dy:-450})" aria-label="Su">↑</button>
-    <button class="sec" onclick="relayAct({type:'scroll',dy:450})" aria-label="Giù">↓</button>
-    <span id="rstatus"></span>
-    <button class="sec" onclick="relayStop()">Chiudi</button>
-  </div>
-  <div class="rbar">
-    <input id="rtext" placeholder="Scrivi nel campo che hai toccato" autocomplete="off"
-      enterkeyhint="send" onkeydown="if(event.key==='Enter')relayType()">
-    <button onclick="relayType()">Scrivi</button>
-    <button class="sec" onclick="relayAct({type:'key',key:'Enter'})">Invio</button>
-  </div>
-</div>
 <input type="file" id="file" accept="image/*" multiple hidden>
 <button class="fab" id="add">Aggiungi le foto di un capo</button>
 
 <script>
-/* Continuous-line illustrations, drawn on one 64-grid at one stroke weight so
-   they read as a set. The rebrand unravels its logo into a single flowing
-   line — same idea, and 2KB inline instead of a Lottie runtime. */
+/* Continuous-line illustrations, one 64-grid, one stroke weight. */
 const ILLU = {
   hanger: `<path pathLength="100" d="M32 15c0-3.3 2.7-6 6-6s6 2.7 6 6c0 2.6-1.7 4-4.3 5L32 23 8 36c-2.2 1.1-3.4 2.3-3.4 3.9 0 2 1.8 3.4 4.4 3.4h46c2.6 0 4.4-1.4 4.4-3.4 0-1.6-1.2-2.8-3.4-3.9L32 23"/>`,
-  spark:  `<path pathLength="100" d="M24 8l3.6 9.9L37.5 21.5 27.6 25.1 24 35l-3.6-9.9L10.5 21.5l9.9-3.6z"/><path pathLength="100" d="M45 32l2 5.5 5.5 2-5.5 2-2 5.5-2-5.5-5.5-2 5.5-2z"/>`,
-  link:   `<path pathLength="100" d="M18 23H30A9 9 0 0130 41H18A9 9 0 0118 23Z"/><path pathLength="100" d="M34 23H46A9 9 0 0146 41H34A9 9 0 0134 23Z"/>`,
   bell:   `<path pathLength="100" d="M32 13a12.5 12.5 0 00-12.5 12.5v7.8L15 41h34l-4.5-7.7v-7.8A12.5 12.5 0 0032 13z"/><path pathLength="100" d="M27.5 46a4.5 4.5 0 009 0"/><path pathLength="100" d="M32 8.5V13"/>`,
   check:  `<path pathLength="100" d="M14 33l12 12 24-26"/>`,
 };
@@ -220,140 +167,91 @@ const $ = (s) => document.querySelector(s);
 const api = (p, o) => fetch('/api' + p, o).then((r) => r.json());
 const eur = (n) => (n == null ? '—' : '€' + Number(n).toFixed(2).replace('.00', ''));
 const esc = (s) => (s || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
-let items = [], CFG = {};
+let items = [], CFG = {}, showSetup = false, uploading = 0, draining = false;
 
-const LABEL = { queued:'In coda', analyzing:'Analisi', needs_input:'Serve conferma',
-  pending:'Da approvare', live:'Online', sold:'Venduto', error:'Errore' };
+const LABEL = { queued:'In coda', analyzing:'Analisi', needs_input:'Serve conferma', pending:'Da approvare',
+  ready:'Pronto da pubblicare', live:'Online', sold:'Venduto', error:'Errore' };
 
 async function refresh() {
   const [st, d] = await Promise.all([api('/status'), api('/items')]);
-  // A 401 used to fall through and render as "nothing is configured", which
-  // looks identical to a broken install. Say what actually happened.
   if (st.error === 'unauthorized') return locked();
   CFG = st; $('#ver').textContent = 'v' + st.version;
   renderSetup(st); apkBanner(st);
   items = d.items || [];
-  render(!!document.querySelector('.onb'));  // one thing at a time
+  render(!!document.querySelector('.onb'));
 }
 
 function locked() {
-  $('#ver').textContent = '';
-  $('#list').innerHTML = '';
-  $('#add').style.display = 'none';
-  $('#gear').style.display = 'none';
-  $('#setup').innerHTML = `<div class="card setup"><h2>Accesso richiesto</h2>
+  $('#ver').textContent = ''; $('#list').innerHTML = '';
+  $('#add').style.display = 'none'; $('#gear').style.display = 'none';
+  $('#setup').innerHTML = `<div class="card"><h2>Accesso richiesto</h2>
     <p style="margin-top:6px">Apri l'app aggiungendo la tua chiave all'indirizzo:<br>
     <code style="color:var(--calypso)">…workers.dev/?k=LA_TUA_CHIAVE</code></p>
     <p>Basta una volta per dispositivo: dopo resta salvata in un cookie.</p></div>`;
 }
 
-const STEPS = [
-  { key:'session', icon:'link',  title:'Collega il tuo account Vinted',
-    body:"Così l'app può pubblicare per te e seguire i prezzi.", cta:'Collega' },
-  { key:'push',    icon:'bell',  title:'Attiva le notifiche',
-    body:'Ti avvisiamo solo quando un articolo è pronto da approvare.', cta:'Attiva' },
-];
-
-// A step the browser has permanently refused cannot be satisfied by any action,
-// so it can be waived. Everything else is mandatory — no skipping into a
-// half-configured app that then fails silently.
-const waived = (k) => { try { return localStorage.getItem('waive_' + k) === '1'; } catch { return false; } };
+// One step. Vinted is never connected: the app reads public pages only.
 const pushBlocked = () => !('Notification' in window) || Notification.permission === 'denied';
-window.waive = (k) => { try { localStorage.setItem('waive_' + k, '1'); } catch {} refresh(); };
-
-let showSetup = false;
-const stepOk = (st, step) => st[step.key] || waived(step.key);
-function setupDone(st) { return STEPS.every((step) => stepOk(st, step)); }
+const waived = () => { try { return localStorage.getItem('waive_push') === '1'; } catch { return false; } };
+window.waive = () => { try { localStorage.setItem('waive_push', '1'); } catch {} refresh(); };
+const setupDone = (st) => st.push || waived();
 
 function renderSetup(st) {
   const box = $('#setup');
-  // Not an onboarding step: the seller cannot fix this, and silently producing
-  // nothing would be worse than saying the server is misconfigured.
-  const broken = st.ai ? '' : `<div class="card setup"><h2>Servizio non configurato</h2>
-    <p style="margin:6px 0 0">Manca la chiave del modello lato server. L'analisi delle
-    foto non funzionerà finché non viene impostata.</p></div>`;
-
-  const blocking = !setupDone(st);
-  const open = blocking || showSetup;
+  const broken = st.ai ? '' : `<div class="card"><h2>Servizio non configurato</h2>
+    <p style="margin:6px 0 0">Manca la chiave del modello lato server. L'analisi delle foto non funzionerà finché non viene impostata.</p></div>`;
+  const open = !setupDone(st) || showSetup;
   box.classList.toggle('gate', open);
   document.body.classList.toggle('gated', open);
   if (!open) { box.innerHTML = broken; return; }
-
-  const active = STEPS.findIndex((step) => !stepOk(st, step));
+  const done = setupDone(st);
   box.innerHTML = broken + `<div class="card onb">
-    <div class="onb-h">${illu(active < 0 ? 'check' : STEPS[active].icon, 56)}
-      <div><h2>${active < 0 ? 'Tutto pronto' : 'Benvenuto'}</h2>
-      <p style="margin:0">${active < 0 ? 'Puoi modificare tutto da qui.'
-        : `Passaggio ${active + 1} di ${STEPS.length} — si fa una volta sola.`}</p></div></div>
-    <div class="dots">${STEPS.map((_, i) =>
-      `<i class="${stepOk(st, STEPS[i]) ? 'ok' : i === active ? 'now' : ''}"></i>`).join('')}</div>
-    ${STEPS.map((step, i) => stepRow(step, st, i === active)).join('')}
-    ${blocking ? '' : `<button class="sec" style="width:100%;margin-top:14px"
-        onclick="showSetup=false;refresh()">Chiudi</button>`}
-  </div>`;
-}
-
-function stepRow(step, st, isActive) {
-  const done = stepOk(st, step);
-  if (!isActive) return `<div class="step ${done ? 'done' : ''}">
-    <span class="tick">${done ? '✓' : '·'}</span><span>${step.title}</span></div>`;
-
-  const field = step.key === 'session'
-    ? `<p style="margin:8px 0 0;font-size:12.5px">Si apre Vinted qui dentro e l'app tiene solo la
-       sessione, mai le tue credenziali.</p>
-       <div class="warn" style="margin-top:8px">Google blocca l'accesso dai browser automatici
-       ("questo browser potrebbe non essere sicuro"), quindi qui il tasto Google non funziona.
-       Funzionano <b>e-mail e password</b>: se il tuo account è nato con Google, impostane una
-       con "Password dimenticata" su Vinted, una volta sola.</div>
-       <p style="margin:8px 0 0;font-size:12.5px"><a href="#" onclick="event.preventDefault();cookieFallback()"
-         style="color:var(--calypso)">Oppure collega da computer incollando i cookie →</a></p>`
-    : '';
-
-  // Notifications denied at browser level: no button here can ever satisfy it.
-  const escape = step.key === 'push' && pushBlocked()
-    ? `<button class="sec" style="margin:12px 0 0 8px" onclick="waive('push')">Continua senza</button>`
-    : '';
-
-  return `<div class="step active">
-    <span class="tick now">${STEPS.indexOf(step) + 1}</span>
-    <div style="flex:1"><b>${step.title}</b><p style="margin:4px 0 0">${step.body}</p>
-      ${field}
-      <button style="margin-top:12px" onclick="setup('${step.key}')">${step.cta}</button>${escape}</div>
+    <div class="onb-h">${illu(done ? 'check' : 'bell', 56)}
+      <div><h2>${done ? 'Tutto pronto' : 'Benvenuto'}</h2>
+      <p style="margin:0">${done ? 'Puoi modificare tutto da qui.' : 'Un solo passaggio, una volta sola.'}</p></div></div>
+    <div class="step"><span class="tick">${done ? '✓' : '1'}</span>
+      <div style="flex:1"><b>Attiva le notifiche</b>
+        <p style="margin:4px 0 0">Ti avviso solo quando un capo è pronto da approvare o un ribasso è dovuto.</p>
+        <p style="margin:6px 0 0;font-size:12.5px">L'app non si collega mai al tuo account Vinted: legge solo pagine pubbliche. Niente da bannare.</p>
+        ${done ? '' : `<button style="margin-top:12px" onclick="enablePush()">Attiva</button>
+          ${pushBlocked() ? `<button class="sec" style="margin:12px 0 0 8px" onclick="waive()">Continua senza</button>` : ''}`}
+      </div></div>
+    ${done ? `<button class="sec" style="width:100%;margin-top:14px" onclick="showSetup=false;refresh()">Chiudi</button>` : ''}
   </div>`;
 }
 
 function apkBanner(st) {
   const r = new URLSearchParams(location.search).get('v');
   if (!r || r === st.apk_version) return;
-  $('#setup').insertAdjacentHTML('afterbegin', `<div class="card setup"><div class="row">
+  $('#setup').insertAdjacentHTML('afterbegin', `<div class="card"><div class="row">
     <span style="flex:1">Nuova versione: ${st.apk_version}</span>
     <a href="/app.apk" download><button class="sec">Scarica</button></a></div></div>`);
 }
 
-window.setup = async (what) => {
-  if (what === 'session') return relayOpen();
-  if (what === 'push') {
-    if (!('Notification' in window)) return alert('Notifiche non supportate su questo browser.');
-    const reg = await navigator.serviceWorker.register('/sw.js');
-    if ((await Notification.requestPermission()) !== 'granted') return;
-    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true,
-      applicationServerKey: Uint8Array.from(atob(CFG.vapid_public.replace(/-/g,'+').replace(/_/g,'/')), c=>c.charCodeAt(0)) });
-    await api('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
-    refresh();
-  }
+window.enablePush = async () => {
+  if (!('Notification' in window)) return alert('Notifiche non supportate su questo browser.');
+  const reg = await navigator.serviceWorker.register('/sw.js');
+  if ((await Notification.requestPermission()) !== 'granted') return refresh();
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true,
+    applicationServerKey: Uint8Array.from(atob(CFG.vapid_public.replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0)) });
+  await api('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) });
+  refresh();
 };
 
 function render(duringOnboarding) {
   $('#list').innerHTML = items.map(card).join('') || (duringOnboarding ? '' :
-    `<div class="empty">${illu('hanger', 76)}<b>Niente da vendere, per ora</b>Fotografa un capo — meglio se includi l'etichetta —<br>e al resto pensa l'app.</div>`);
+    `<div class="empty">${illu('hanger', 76)}<b>Niente da vendere, per ora</b>Fotografa un capo — meglio se includi l'etichetta —<br>oppure condividi le foto dalla galleria a Quicksell.</div>`);
 }
 
-function thumbs(i) { return `<div class="thumbs">${i.photos.map(k =>
-  `<img src="/api/photo/${encodeURIComponent(k)}" loading="lazy" alt="">`).join('')}</div>`; }
+const thumbs = (i) => `<div class="thumbs">${i.photos.map(k => `<img src="/api/photo/${encodeURIComponent(k)}" loading="lazy" alt="">`).join('')}</div>`;
+const copyBar = (i) => `<div class="row" style="flex-wrap:wrap;gap:8px;margin-top:8px">
+  <button class="sec" onclick="copyText(${JSON.stringify(i.title)},this)">Copia titolo</button>
+  <button class="sec" onclick="copyText(${JSON.stringify(i.description)},this)">Copia descrizione</button>
+  <button class="sec" onclick="copyText('${i.list_price}',this)">Copia prezzo</button></div>`;
 
 function card(i) {
-  const head = (extra = '') => `<div class="row"><span class="badge ${i.status}">${LABEL[i.status]}</span>${extra}</div>`;
-  const open = `<div class="card" data-s="${i.status}">`;
+  const open = `<div class="card${i.due_price != null ? ' due' : ''}" data-s="${i.status}">`;
+  const head = (x = '') => `<div class="row"><span class="badge ${i.status}">${LABEL[i.status]}</span>${x}</div>`;
 
   if (i.status === 'analyzing' || i.status === 'queued')
     return `${open}${head('<span class="sp"></span>')}${thumbs(i)}</div>`;
@@ -361,14 +259,32 @@ function card(i) {
   if (i.status === 'error')
     return `${open}${head(`<button class="sec" onclick="act(${i.id},'retry')">Riprova</button>`)}${thumbs(i)}<p class="note">${esc(i.note)}</p></div>`;
 
-  if (i.status === 'live' || i.status === 'sold')
+  if (i.status === 'ready')
+    return `${open}${head()}${thumbs(i)}<h2>${esc(i.title)}</h2>
+      <div class="prices"><div><b>${eur(i.list_price)}</b><span>pubblichi a</span></div>
+        <div><b>${eur(i.est_price)}</b><span>stima</span></div><div><b>${eur(i.floor_price)}</b><span>minimo</span></div></div>
+      <div class="hint"><b>Dal computer:</b> apri vinted.it → Vendi. L'estensione porta le foto e compila tutto; tu scegli i menu e pubblichi.</div>
+      <details><summary>Oppure pubblica dall'app Vinted sul telefono</summary>
+        <p style="margin:6px 0 0">Copia i testi, scegli le stesse foto in Vinted, pubblica. Poi condividi l'annuncio a Quicksell (o incolla il link qui) e da lì seguo il prezzo.</p>
+        ${copyBar(i)}
+        <div class="row" style="margin-top:10px"><input id="u${i.id}" placeholder="https://www.vinted.it/items/…" inputmode="url">
+          <button class="sec" onclick="published(${i.id})">Collega</button></div></details>
+      <div class="row" style="margin-top:12px"><button class="sec" onclick="act(${i.id},'reject')">Scarta</button></div></div>`;
+
+  if (i.status === 'live' || i.status === 'sold') {
+    const due = i.status === 'live' && i.due_price != null;
     return `${open}${head(`<span class="v" style="margin-left:auto">${i.views||0} visite · ${i.favourites||0} preferiti</span>`)}
       ${thumbs(i)}<h2>${esc(i.title)}</h2>
       <div class="prices"><div><b>${eur(i.current_price)}</b><span>ora</span></div>
-        <div><b>${eur(i.list_price)}</b><span>iniziale</span></div>
-        <div><b>${eur(i.floor_price)}</b><span>minimo</span></div></div>
-      ${i.status==='live' ? `<p style="margin-top:10px">−5% ogni 3 giorni, fino a ${eur(i.floor_price)}.</p>` : ''}</div>`;
+        <div><b>${eur(i.list_price)}</b><span>iniziale</span></div><div><b>${eur(i.floor_price)}</b><span>minimo</span></div></div>
+      ${due ? `<div class="warn"><b>Ribasso dovuto:</b> porta il prezzo a <b>${eur(i.due_price)}</b>.
+          <div class="row" style="margin-top:8px"><a class="btn" href="${esc(i.vinted_url)}/edit" target="_blank" rel="noopener"><button class="warn">Apri su Vinted</button></a>
+          <button class="sec" onclick="act(${i.id},'dropped')">Fatto</button></div></div>`
+        : i.status === 'live' ? `<p style="margin-top:10px">−${CFG.drop_pct || 5}% ogni ${CFG.drop_days || 3} giorni, fino a ${eur(i.floor_price)}. Ti avviso io.</p>` : ''}
+      ${i.vinted_url ? `<p style="margin-top:6px"><a href="${esc(i.vinted_url)}" target="_blank" rel="noopener" style="color:var(--calypso)">Vedi l'annuncio →</a></p>` : ''}</div>`;
+  }
 
+  // pending / needs_input — the approval card
   const nb = i.needs.includes('brand'), ns = i.needs.includes('size');
   return `${open}${head()}${thumbs(i)}
     <label>Titolo</label><input id="t${i.id}" value="${esc(i.title)}" maxlength="60">
@@ -377,12 +293,8 @@ function card(i) {
       <div style="flex:1"><label>Marca${nb?' ⚠':''}</label><input id="b${i.id}" value="${esc(i.brand)}" placeholder="—"></div>
       <div style="flex:1"><label>Taglia${ns?' ⚠':''}</label><input id="s${i.id}" value="${esc(i.size)}" placeholder="—"></div>
     </div>
-    ${nb?`<div class="warn">Non ho letto la marca su un'etichetta, l'ho dedotta dallo stile.
-      Puoi <b>lasciare vuoto il campo Marca</b> e pubblicare senza: è consentito e toglie ogni
-      rischio. Tienila solo se sei sicuro — un marchio non verificabile è la causa n.1 di rimozione.
-      <button class="sec" style="margin-top:8px;padding:8px 12px;font-size:12px"
-        onclick="document.getElementById('b${i.id}').value='';this.closest('.warn').remove()">Pubblica senza marca</button></div>`:''}
-    ${i.needs.includes('vinted')?`<div class="warn">Prezzo stimato senza dati di mercato — Vinted non era collegato. Collegalo e tocca Riprova.</div>`:''}
+    ${nb?`<div class="warn">Non ho letto la marca su un'etichetta, l'ho dedotta dallo stile. Puoi <b>lasciare vuoto</b> il campo e pubblicare senza: è consentito e toglie ogni rischio.
+      <button class="sec" style="margin-top:8px;padding:8px 12px;font-size:12px" onclick="document.getElementById('b${i.id}').value='';this.closest('.warn').remove()">Senza marca</button></div>`:''}
     ${ns&&!i.size?`<div class="warn">Taglia non trovata. Inseriscila: è il motivo n.1 di resi.</div>`:''}
     <div class="prices">
       <div><b>${eur(i.est_price)}</b><span>valore stimato</span></div>
@@ -393,134 +305,58 @@ function card(i) {
       <span class="v">Da ${i.comparables.sold} venduti e ${i.comparables.active} annunci attivi.</span></div>
       <details><summary>Vedi i comparabili</summary>${i.comparables.sample.map(c=>
         `<div class="v" style="padding:3px 0">${c.sold?'✔':'·'} ${esc(c.title)} — ${eur(c.price)}</div>`).join('')}</details>`:''}
+    ${i.note?`<p class="hint" style="margin-top:8px">${esc(i.note)}</p>`:''}
     <div class="row" style="margin-top:16px">
-      <button style="flex:1" onclick="approve(${i.id})">Pubblica su Vinted</button>
+      <button style="flex:1" onclick="approve(${i.id})">Approva</button>
       <button class="sec" onclick="act(${i.id},'reject')">Scarta</button>
-    </div>
-    <details style="margin-top:6px"><summary>Oppure pubblica tu dall'app Vinted</summary>
-      <p style="margin:6px 0 8px">Copia i testi e incollali nell'app Vinted: niente sessione, niente blocchi.</p>
-      <div class="row" style="flex-wrap:wrap;gap:8px">
-        <button class="sec" onclick="copyField('t${i.id}',this)">Copia titolo</button>
-        <button class="sec" onclick="copyField('d${i.id}',this)">Copia descrizione</button>
-        <button class="sec" onclick="copyField('p${i.id}',this)">Copia prezzo</button>
-      </div></details></div>`;
+    </div></div>`;
 }
 
-window.copyField = async (id, btn) => {
-  const v = $('#' + id).value;
+window.copyText = async (v, btn) => {
   try { await navigator.clipboard.writeText(v); } catch { prompt('Copia:', v); return; }
-  const was = btn.textContent; btn.textContent = 'Copiato ✓';
-  setTimeout(() => { btn.textContent = was; }, 1400);
+  const was = btn.textContent; btn.textContent = 'Copiato ✓'; setTimeout(() => { btn.textContent = was; }, 1400);
 };
-
 window.act = async (id, w) => { await api(`/items/${id}/${w}`, { method:'POST' }); refresh(); };
-
+window.published = async (id) => {
+  const r = await api(`/items/${id}/published`, { method:'POST', body: JSON.stringify({ url: $('#u' + id).value.trim() }) });
+  if (r.error) return alert(r.error);
+  refresh();
+};
 window.approve = async (id) => {
   const g = (p) => $('#' + p + id).value.trim();
-  const b = event.target; b.disabled = true; b.textContent = 'Pubblico…';
+  const b = event.target; b.disabled = true; b.textContent = 'Salvo…';
   const r = await api(`/items/${id}/approve`, { method:'POST', body: JSON.stringify({
     title:g('t'), description:g('d'), brand:g('b'), size:g('s'),
     list_price:Number(g('p')), floor_price:Number(g('f')), brand_confirmed:true }) });
-  if (r.error) {
-    b.disabled = false; b.textContent = 'Pubblica su Vinted';
-    alert(/captcha|interstitial|browser/i.test(r.error)
-      ? 'Vinted ha bloccato la pubblicazione automatica per questa volta. Apri "Oppure pubblica tu dall\'app Vinted" qui sotto: copi i testi e pubblichi dall\'app in un minuto.'
-      : r.error);
-    return;
-  }
+  if (r.error) { alert(r.error); b.disabled = false; b.textContent = 'Approva'; return; }
   refresh();
 };
 
-// --- Relayed browser -------------------------------------------------------
-let RS = null;
-const rstat = (t) => { $('#rstatus').textContent = t; };
-
-window.relayOpen = async () => {
-  $('#relay').hidden = false;
-  rstat('Apro Vinted…');
-  const r = await api('/session/browser/start', { method: 'POST' });
-  if (r.error) { rstat(r.error); return; }
-  RS = r.sessionId; paint(r); rstat('Accedi come fai di solito');
-};
-
-function paint(r) {
-  const img = $('#rimg');
-  img.src = 'data:image/jpeg;base64,' + r.shot;
-  img.dataset.w = r.w; img.dataset.h = r.h;
+// Uploads and analysis run in the background: queue the next capo immediately.
+function fabLabel() { $('#add').textContent = uploading ? `Carico ${uploading}… aggiungine un altro` : 'Aggiungi le foto di un capo'; }
+async function pump() {
+  if (draining) return;
+  draining = true;
+  try { for (;;) { const r = await api('/drain', { method:'POST' }).catch(() => ({})); await refresh(); if (!r || !r.processed) break; } }
+  finally { draining = false; }
 }
-
-window.relayAct = async (act) => {
-  if (!RS) return;
-  rstat('…');
-  const r = await api('/session/browser/act', { method: 'POST', body: JSON.stringify({ sessionId: RS, act }) });
-  if (r.error) { rstat(r.error); return; }
-  if (r.done) { $('#relay').hidden = true; RS = null; refresh(); return; }
-  paint(r); rstat('');
-};
-
-window.relayClick = (e) => {
-  relayClickFeedback(e);
-  const img = $('#rimg'), rect = img.getBoundingClientRect();
-  // Scale each axis separately. A single factor was wrong whenever the layout
-  // squashed the screenshot out of its aspect ratio, and every tap landed high.
-  const sx = (img.naturalWidth || Number(img.dataset.w)) / rect.width;
-  const sy = (img.naturalHeight || Number(img.dataset.h)) / rect.height;
-  relayAct({ type: 'click', x: Math.round((e.clientX - rect.left) * sx),
-                            y: Math.round((e.clientY - rect.top) * sy) });
-};
-
-window.relayType = () => {
-  const el = $('#rtext'); if (!el.value) return;
-  const text = el.value; el.value = '';
-  relayAct({ type: 'text', text });
-};
-
-// A tap should feel like it landed even while the round trip is in flight.
-window.relayClickFeedback = (e) => {
-  const d = document.createElement('i'); d.className = 'tapdot';
-  d.style.left = e.clientX + 'px'; d.style.top = e.clientY + 'px';
-  document.body.appendChild(d); setTimeout(() => d.remove(), 450);
-};
-
-window.relayStop = async () => {
-  $('#relay').hidden = true;
-  if (RS) await api('/session/browser/stop', { method: 'POST', body: JSON.stringify({ sessionId: RS }) });
-  RS = null; refresh();
-};
-
-window.cookieFallback = async () => {
-  // document.cookie does NOT work here: Vinted marks its session cookies
-  // HttpOnly, so JavaScript cannot see them. The request header can.
-  const c = prompt(
-    'Da computer, una volta sola:\n\n' +
-    '1. Apri vinted.it e accedi come fai di solito (Google va benissimo).\n' +
-    '2. Premi F12 e vai su Rete / Network.\n' +
-    '3. Ricarica la pagina e clicca la prima riga (vinted.it).\n' +
-    '4. In Intestazioni / Headers cerca "Cookie:" fra le intestazioni della richiesta.\n' +
-    '5. Copia TUTTO il valore e incollalo qui.\n\n' +
-    'Nota: la Console con document.cookie NON funziona — i cookie di sessione\n' +
-    'sono HttpOnly e Javascript non li vede.'
-  );
-  if (!c) return;
-  const r = await api('/session', { method:'POST', body: JSON.stringify({ cookie: c.trim() }) });
-  if (r.error) return alert(r.error);
-  alert(`Collegato — ${r.cookies} cookie salvati. Da qui in poi puoi usare solo il telefono.`);
-  refresh();
-};
-
-$('#gear').onclick = () => { showSetup = true; refresh(); };
 $('#add').onclick = () => $('#file').click();
-$('#file').onchange = async (e) => {
-  const fd = new FormData();
-  for (const f of e.target.files) fd.append('photos', f);
-  $('#add').disabled = true; $('#add').textContent = 'Carico…';
-  await fetch('/api/items', { method:'POST', body:fd });
-  $('#file').value = ''; $('#add').disabled = false; $('#add').textContent = 'Aggiungi le foto di un capo';
-  refresh();
-  await api('/drain', { method:'POST' }).then(refresh);   // work happens while the app is open
+$('#file').onchange = (e) => {
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  const fd = new FormData(); for (const f of files) fd.append('photos', f);
+  uploading++; fabLabel();
+  fetch('/api/items', { method:'POST', body: fd }).then(() => { refresh(); pump(); }).finally(() => { uploading--; fabLabel(); });
 };
+$('#gear').onclick = () => { showSetup = true; refresh(); };
 
-navigator.serviceWorker?.register('/sw.js').catch(()=>{});
+if (new URLSearchParams(location.search).get('shared')) {
+  document.body.insertAdjacentHTML('beforeend', `<div class="toast">Foto ricevute: sto preparando l'annuncio.</div>`);
+  history.replaceState(null, '', '/');
+  setTimeout(() => document.querySelector('.toast')?.remove(), 4000);
+  setTimeout(pump, 800);
+}
+navigator.serviceWorker?.register('/sw.js').catch(() => {});
 refresh();
 setInterval(() => {
   if (uploading || items.some((i) => ['analyzing', 'queued'].includes(i.status))) {

@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Quicksell per Vinted",
+  "version": "1.0.0",
+  "description": "Aggiungi le foto a un nuovo annuncio Vinted: titolo, descrizione e prezzo si compilano da soli. I ribassi sono un click.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://www.vinted.it/*",
+    "https://*.workers.dev/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.vinted.it/items/new*",
+        "https://www.vinted.it/items/*/edit*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Quicksell"
+  },
+  "icons": {
+    "128": "icon.png"
+  }
+}

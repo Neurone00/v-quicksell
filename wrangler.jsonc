@@ -17,7 +17,6 @@
   "kv_namespaces": [
     { "binding": "KV", "id": "205eb9712486470fb7d69dfb17adb7d1" }
   ],
-  "browser": { "binding": "BROWSER" },
   "images": { "binding": "IMAGES" },
 
   "triggers": { "crons": ["* * * * *", "0 9 * * *"] },
@@ -25,7 +24,6 @@
   "vars": {
     "VINTED_HOST": "www.vinted.it",
     "LOCALE": "it",
-    "LOGIN_PATH": "/member/register/select_type?ref_url=%2Fitems%2Fnew",
     "GEMINI_MODEL": "gemini-3.5-flash",
     "CURRENCY": "EUR",
     "BUMP_PCT": 50,

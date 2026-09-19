@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS items (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   status        TEXT NOT NULL DEFAULT 'analyzing',
-  -- analyzing | needs_input | pending | live | sold | archived | error
+  -- queued | analyzing | needs_input | pending | ready | live | sold | archived | error
   photos        TEXT NOT NULL,          -- JSON array of R2 keys
   title         TEXT,
   description   TEXT,
@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS items (
   needs         TEXT,                   -- JSON array of fields awaiting you
   note          TEXT,
   vinted_id     TEXT,
+  vinted_url    TEXT,
+  next_drop_at  TEXT,
+  due_price     REAL,
   views         INTEGER DEFAULT 0,
   favourites    INTEGER DEFAULT 0,
   started_at    TEXT,

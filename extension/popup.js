@@ -42,8 +42,15 @@ async function connectPhone() {
   box.innerHTML = `<div class="card"><b>Collega il telefono</b><br>
     <small>Inquadra il QR col telefono (o apri il link): entra nello stesso account.</small><br>
     ${img}
-    <button class="big" id="cpl" style="width:100%">Copia link</button></div>`;
+    <button class="big" id="cpl" style="width:100%">Copia link</button>
+    <div style="margin-top:12px;border-top:1px solid rgba(0,0,0,.08);padding-top:10px">
+      <b>La tua chiave d'accesso</b><br>
+      <small>È il tuo account. Salvala: con questa rientri sempre, anche da un altro computer.</small>
+      <div style="font:12px ui-monospace,Menlo,monospace;word-break:break-all;background:#14201e;color:#d7e4e1;border-radius:8px;padding:8px;margin-top:6px">${secret}</div>
+      <button class="big" id="ckey" style="width:100%;margin-top:6px">Copia chiave</button>
+    </div></div>`;
   document.getElementById('cpl').onclick = () => navigator.clipboard.writeText(link).then(() => { document.getElementById('cpl').textContent = 'Copiato ✓'; });
+  document.getElementById('ckey').onclick = () => navigator.clipboard.writeText(secret).then(() => { document.getElementById('ckey').textContent = 'Copiata ✓'; });
 }
 $('#save').onclick = () => chrome.storage.sync.set({ appUrl: $('#appUrl').value.trim().replace(/\/$/, ''), secret: $('#secret').value.trim() }, () => { $('#st').textContent = 'Salvato'; load(); });
 

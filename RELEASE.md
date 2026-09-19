@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.5
+
+**1.4.5** — the popup now shows your account key with a Copia button, so you can back it up. Auto-updates keep it; only removing the extension clears it.
+
 ## Quicksell 1.4.4
 
 **1.4.4** — finds Vinted’s price field reliably (it lives in the “Prezzo” section, not by a name the extension could guess). Diagnostica now dumps each field’s placeholder and label.

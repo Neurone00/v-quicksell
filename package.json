@@ -10,7 +10,8 @@
     "vapid": "node scripts/vapid.mjs",
     "check": "node scripts/check.mjs && node test.mjs",
     "release": "bash scripts/release.sh",
-    "user": "bash scripts/user.sh"
+    "user": "bash scripts/user.sh",
+    "lottie": "node scripts/lottie-brand.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.135.0"

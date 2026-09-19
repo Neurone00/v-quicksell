@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.3
+
+**1.4.3** — the price now fills correctly. Vinted only shows the price field after you pick a category, so the extension waits for it and fills it the moment it appears. Uses Vinted's real save-button id too.
+
 ## Quicksell 1.4.2
 
 **1.4.2** — fixes the popup: the **Crea account** button now actually appears (a bad edit in 1.4.0 left the old "open the app" message in place).

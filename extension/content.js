@@ -11,11 +11,31 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Candidate selectors per field, first match wins. Corrected via learn mode.
 const FIELDS = {
-  title:       ['input[name="title"]', 'input[data-testid*="title"]', 'input[placeholder*="es. "]'],
-  description: ['textarea[name="description"]', 'textarea[data-testid*="description"]', 'textarea'],
-  price:       ['input[name="price"]', 'input[data-testid*="price"]', 'input[inputmode="decimal"]'],
+  title:       ['#title', 'input[name="title"]', 'input[data-testid*="title"]', 'input[placeholder*="es. "]'],
+  description: ['#description', 'textarea[name="description"]', 'textarea[data-testid*="description"]', 'textarea'],
+  price:       ['#price', 'input[name="price"]', 'input[data-testid*="price"]', 'input[inputmode="decimal"]'],
 };
 const find = (cands) => { for (const c of cands) { const el = document.querySelector(c); if (el) return el; } return null; };
+
+// The price input only appears after a category is chosen, and its name can
+// vary, so also match an input whose label/nearby text says "Prezzo".
+function findPrice() {
+  const byId = find(FIELDS.price);
+  if (byId) return byId;
+  for (const el of document.querySelectorAll('input')) {
+    const lab = (el.labels?.[0]?.textContent || el.closest('label')?.textContent || el.getAttribute('aria-label') || el.placeholder || '').toLowerCase();
+    if (/prezzo|price/.test(lab) && !/spedizione|shipping/.test(lab)) return el;
+  }
+  return null;
+}
+
+// Vinted's save button on the upload/edit form (from the live form: id
+// upload-form-save-button, label "Carica"). Text match is the fallback.
+function findSave() {
+  return document.querySelector('#upload-form-save-button')
+    || [...document.querySelectorAll('button')].find((el) => /^(salva|aggiorna|conferma|carica|pubblica|salva modifiche)$/i.test(el.textContent.trim()))
+    || document.querySelector('button[type="submit"]');
+}
 const esc = (s) => String(s ?? '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
 
 // React ignores el.value = x; it needs the native setter plus an input event.
@@ -85,11 +105,29 @@ function injectPhotos(files) {
 }
 
 function fillText(it) {
-  const t = find(FIELDS.title), d = find(FIELDS.description), p = find(FIELDS.price);
+  const t = find(FIELDS.title), d = find(FIELDS.description), p = findPrice();
   if (t) type(t, it.title);
   if (d) type(d, it.description);
   if (p) type(p, String(it.list_price).replace('.', ','));
-  return [['Titolo', t], ['Descrizione', d], ['Prezzo', p]].filter(([, el]) => !el).map(([n]) => n);
+  else watchPrice(String(it.list_price).replace('.', ','));  // appears after you pick the category
+  // Title/description are the required ones; price is expected to be missing
+  // on a fresh form, so don't report it as a failure.
+  return [['Titolo', t], ['Descrizione', d]].filter(([, el]) => !el).map(([n]) => n);
+}
+
+// Fill the price the moment Vinted renders it (after category selection).
+let priceWatcher;
+function watchPrice(value) {
+  priceWatcher?.disconnect();
+  const tryFill = () => {
+    const p = findPrice();
+    if (p && !p.value) { type(p, value); priceWatcher.disconnect(); clearTimeout(stop); return true; }
+    return false;
+  };
+  if (tryFill()) return;
+  priceWatcher = new MutationObserver(tryFill);
+  priceWatcher.observe(document.body, { childList: true, subtree: true });
+  const stop = setTimeout(() => priceWatcher.disconnect(), 180000);  // give up after 3 min
 }
 
 function hints(it, missing, photosOk) {
@@ -104,6 +142,7 @@ function hints(it, missing, photosOk) {
       <b>Colore</b>: ${esc(it.color || '—')} &nbsp; <b>Materiale</b>: ${esc(it.material || '—')}
     </div>
     <div style="margin-top:10px;font-size:12px;color:#5A6566">Prezzo ${esc(it.list_price)} € · stima ${esc(it.est_price)} € · minimo ${esc(it.floor_price)} €.<br>
+    ${findPrice() ? '' : 'Il campo prezzo compare dopo che scegli la categoria: lo riempio io appena appare.<br>'}
     Quando pubblichi, l'app collega l'annuncio da sola e da lì segue il prezzo.</div>`;
 }
 
@@ -203,9 +242,8 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     const batch = b?.ok && b.data && b.data.vintedId === id ? b.data : null;
 
     if (batch) {
-      const p = find(FIELDS.price);
-      const save = [...document.querySelectorAll('button')].find((el) => /^(salva|aggiorna|conferma|salva modifiche)$/i.test(el.textContent.trim()))
-        || document.querySelector('button[type="submit"]');
+      const p = findPrice();
+      const save = findSave();
       if (!p || !save) {
         show(`${head('ribasso')}Prezzo da impostare: <b>${fmt(batch.price)} €</b>.<div class="pw" style="color:#B4690E;font-size:12px;margin-top:8px">Non ho trovato ${!p ? 'il campo prezzo' : 'il pulsante Salva'}: finisci tu questo.</div>`);
         learn();

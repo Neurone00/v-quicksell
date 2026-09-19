@@ -9,7 +9,7 @@
 
   // "/" must hit the Worker so it can set the auth cookie; assets are served
   // before the Worker by default, which silently skipped it.
-  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/"] },
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/", "/ext/*"] },
 
   "d1_databases": [
     { "binding": "DB", "database_name": "quicksell", "database_id": "83fdb7a2-3905-4c18-9fb1-185e4d9a7ff8" }

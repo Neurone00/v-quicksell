@@ -6,10 +6,17 @@
 const DEFAULT_APP = 'https://v-quicksell.neurone00.workers.dev';
 const cfg = () => chrome.storage.sync.get({ appUrl: DEFAULT_APP, secret: '' });
 
+// The app's login cookie is SameSite=Lax, and an extension's request counts
+// as cross-site, so Chrome withholds it. Read it through the cookies API
+// instead and send it as the key. Whoever is logged into the app in this
+// Chrome is who the extension acts for.
 async function appUrl(path) {
   const { appUrl, secret } = await cfg();
-  const u = new URL(path, appUrl || DEFAULT_APP);
-  if (secret) u.searchParams.set('k', secret);
+  const base = appUrl || DEFAULT_APP;
+  const u = new URL(path, base);
+  let k = secret;
+  if (!k) { try { k = (await chrome.cookies.get({ url: base, name: 'qs' }))?.value || ''; } catch {} }
+  if (k) u.searchParams.set('k', k);
   return u;
 }
 async function api(path, init = {}) {

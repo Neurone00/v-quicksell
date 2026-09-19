@@ -72,6 +72,26 @@ export default {
     const url = new URL(req.url);
     const p = url.pathname;
 
+    // Self-hosted extension updates. Chrome, installed via policy with this
+    // update URL, checks updates.xml every few hours and pulls the .crx from
+    // the latest GitHub Release — no zip, no Store. Unauthenticated on purpose:
+    // Chrome's updater carries no cookie, and the repo is public anyway.
+    if (p === '/ext/updates.xml' || p === '/ext/quicksell.crx') {
+      const rel = await latestRelease(env);
+      if (!rel?.crx) return new Response('no release with a .crx yet', { status: 404 });
+      if (p === '/ext/updates.xml') {
+        const xml = `<?xml version='1.0' encoding='UTF-8'?>
+<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
+  <app appid='${env.EXT_ID}'>
+    <updatecheck codebase='${env.PUBLIC_URL}/ext/quicksell.crx' version='${rel.version}' />
+  </app>
+</gupdate>`;
+        return new Response(xml, { headers: { 'content-type': 'application/xml', 'cache-control': 'public, max-age=300' } });
+      }
+      const r = await fetch(rel.crx, { redirect: 'follow' });
+      return new Response(r.body, { status: r.status, headers: { 'content-type': 'application/x-chrome-extension', 'cache-control': 'public, max-age=300' } });
+    }
+
     if (!p.startsWith('/api/')) {
       const res = await env.ASSETS.fetch(req);
       const k = url.searchParams.get('k');
@@ -97,25 +117,6 @@ export default {
 
     if (p === '/api/version') return json({ version: env.APP_VERSION });
 
-    // Self-hosted extension updates. Chrome, installed via policy with this
-    // update URL, checks updates.xml every few hours and pulls the .crx from
-    // the latest GitHub Release — no zip, no Store. Unauthenticated on purpose:
-    // Chrome's updater carries no cookie, and the repo is public anyway.
-    if (p === '/ext/updates.xml' || p === '/ext/quicksell.crx') {
-      const rel = await latestRelease(env);
-      if (!rel?.crx) return new Response('no release with a .crx yet', { status: 404 });
-      if (p === '/ext/updates.xml') {
-        const xml = `<?xml version='1.0' encoding='UTF-8'?>
-<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
-  <app appid='${env.EXT_ID}'>
-    <updatecheck codebase='${env.PUBLIC_URL}/ext/quicksell.crx' version='${rel.version}' />
-  </app>
-</gupdate>`;
-        return new Response(xml, { headers: { 'content-type': 'application/xml', 'cache-control': 'public, max-age=300' } });
-      }
-      const r = await fetch(rel.crx, { redirect: 'follow' });
-      return new Response(r.body, { status: r.status, headers: { 'content-type': 'application/x-chrome-extension', 'cache-control': 'public, max-age=300' } });
-    }
     const user = await userOf(req, env);
     if (!user) return json({ error: 'unauthorized' }, 401);
 

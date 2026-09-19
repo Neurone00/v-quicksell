@@ -120,7 +120,9 @@ async function fillDraft(it) {
 
 async function offerDrafts() {
   const r = await send({ type: 'api', path: '/api/ready', method: 'GET' });
-  if (!r?.ok) return show(`${head('')}Non raggiungo l'app: ${esc(r?.error)}.<br><small>Apri l'icona dell'estensione e controlla indirizzo e chiave.</small>`);
+  if (!r?.ok) return show(/NOT_LOGGED_IN/.test(r?.error || '')
+    ? `${head('')}Non sei ancora entrato nell'app in questo Chrome.<br><small>Apri l'app col tuo link di accesso (una volta), poi ricarica questa pagina.</small>`
+    : `${head('')}Non raggiungo l'app: ${esc(r?.error)}.<br><small>Apri l'icona dell'estensione → Avanzate e controlla l'indirizzo.</small>`);
   const items = r.data.items || [];
   if (!items.length) return show(`${head('')}Nessuna bozza pronta.<br><small>Approva un capo dal telefono, poi ricarica questa pagina.</small>`);
   const el = show(`${head(`${items.length} pront${items.length === 1 ? 'a' : 'e'} dal telefono`)}` +

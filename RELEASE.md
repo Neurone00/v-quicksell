@@ -1,6 +1,8 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
-## Quicksell 1.3.0
+## Quicksell 1.3.1
+
+**1.3.1** — fixes the extension not seeing the app's login (SameSite cookie); it now reads it through Chrome's cookie API.
 
 **New in 1.3.0**
 - **Updates itself.** Installed through Chrome policy, the extension checks the app every few hours and installs new versions silently. No zip, ever again.

@@ -20,11 +20,29 @@ const find = (cands) => { for (const c of cands) { const el = document.querySele
 // The price input only appears after a category is chosen, and its name can
 // vary, so also match an input whose label/nearby text says "Prezzo".
 function findPrice() {
-  const byId = find(FIELDS.price);
-  if (byId) return byId;
+  // 1) direct selectors, incl. the 0,00 placeholder Vinted shows
+  for (const sel of ['#price', 'input[name="price"]', 'input[data-testid*="price"]', 'input[placeholder*="0,00"]', 'input[placeholder*="0.00"]']) {
+    const el = document.querySelector(sel);
+    if (el) return el;
+  }
+  // 2) label / aria on the input itself
   for (const el of document.querySelectorAll('input')) {
     const lab = (el.labels?.[0]?.textContent || el.closest('label')?.textContent || el.getAttribute('aria-label') || el.placeholder || '').toLowerCase();
     if (/prezzo|price/.test(lab) && !/spedizione|shipping/.test(lab)) return el;
+  }
+  // 3) the "Prezzo" section heading, then the input in its container (not Spedizione)
+  const heads = [...document.querySelectorAll('h1,h2,h3,h4,legend,label,span,div')].filter((e) => e.textContent.trim() === 'Prezzo');
+  for (const h of heads) {
+    let scope = h.parentElement;
+    for (let up = 0; up < 4 && scope; up++, scope = scope.parentElement) {
+      const inp = scope.querySelector('input:not([type="checkbox"]):not([type="radio"]):not([type="file"])');
+      if (inp && !/spedizione|shipping/i.test(scope.textContent)) return inp;
+    }
+  }
+  // 4) last resort: an input whose own row shows € but isn't shipping
+  for (const el of document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="file"])')) {
+    const row = (el.closest('div')?.textContent || '') + (el.parentElement?.parentElement?.textContent || '');
+    if (/€/.test(row) && !/spedizione|shipping/i.test(row)) return el;
   }
   return null;
 }
@@ -209,9 +227,10 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     photos: !!document.querySelector('input[type="file"]'),
     title: !!find(FIELDS.title), description: !!find(FIELDS.description), price: !!find(FIELDS.price),
     save: save ? save.textContent.trim() : null,
-    controls: [...document.querySelectorAll('input,textarea,select,button,[role="combobox"]')]
-      .map((el) => [el.tagName.toLowerCase(), el.type || '', el.name || el.id || el.dataset.testid || el.getAttribute('aria-label') || el.placeholder || (el.tagName === 'BUTTON' ? el.textContent.trim().slice(0, 24) : '')].filter(Boolean).join(':'))
-      .filter((c) => c.includes(':') && !/ot-|onetrust|search/i.test(c)).slice(0, 60),
+    priceFound: !!findPrice(),
+    controls: [...document.querySelectorAll('input,textarea,select,[role="combobox"]')]
+      .map((el) => [el.tagName.toLowerCase(), el.type || '', el.name || el.id || el.dataset.testid || '', el.placeholder || '', (el.labels?.[0]?.textContent || el.closest('label')?.textContent || '').trim().slice(0, 20)].map((x) => x.replace(/\s+/g, ' ')).join(' | '))
+      .filter((c) => !/ot-|onetrust|search_text|vendor/i.test(c)).slice(0, 40),
   };
   send({ type: 'api', path: '/api/learn', method: 'POST', body: { url: location.pathname, controls: report.controls } });
   reply(report);

@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.4
+
+**1.4.4** — finds Vinted’s price field reliably (it lives in the “Prezzo” section, not by a name the extension could guess). Diagnostica now dumps each field’s placeholder and label.
+
 ## Quicksell 1.4.3
 
 **1.4.3** — the price now fills correctly. Vinted only shows the price field after you pick a category, so the extension waits for it and fills it the moment it appears. Uses Vinted's real save-button id too.

@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.7
+
+**1.4.7** — compila da solo anche taglia, condizioni, colore, materiale e marca: apre i menu di Vinted e sceglie l'opzione giusta appena compaiono (dopo la categoria). Se un valore non combacia, lo lascia a te e te lo dice nel pannello.
+
 ## Quicksell 1.4.6
 
 **1.4.6** — il prezzo ora si scrive giusto (prima usciva “NaN €”: Vinted legge il numero col punto, non la virgola).

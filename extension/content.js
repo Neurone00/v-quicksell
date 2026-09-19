@@ -123,44 +123,148 @@ function injectPhotos(files) {
 }
 
 function fillText(it) {
-  const t = find(FIELDS.title), d = find(FIELDS.description), p = findPrice();
+  const t = find(FIELDS.title), d = find(FIELDS.description);
   if (t) type(t, it.title);
   if (d) type(d, it.description);
-  if (p) type(p, String(it.list_price));
-  else watchPrice(String(it.list_price));  // appears after you pick the category
-  // Title/description are the required ones; price is expected to be missing
-  // on a fresh form, so don't report it as a failure.
+  autoFill(it);  // price + dropdowns appear after the category; fill them as they show
+  // Title/description are the required ones; everything else can arrive later.
   return [['Titolo', t], ['Descrizione', d]].filter(([, el]) => !el).map(([n]) => n);
 }
 
-// Fill the price the moment Vinted renders it (after category selection).
-let priceWatcher;
-function watchPrice(value) {
-  priceWatcher?.disconnect();
-  const tryFill = () => {
-    const p = findPrice();
-    if (p && !p.value) { type(p, value); priceWatcher.disconnect(); clearTimeout(stop); return true; }
+// ---- auto-fill the fields Vinted renders only after a category is chosen ----
+const norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+const sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// The label cell for a field, climbed to the container that holds its control.
+function fieldRow(labelRe) {
+  const lab = [...document.querySelectorAll('label, legend, h3, h4, span, div')]
+    .find((e) => e.children.length === 0 && labelRe.test(e.textContent.trim()));
+  if (!lab) return null;
+  let row = lab.parentElement;
+  for (let i = 0; i < 6 && row; i++, row = row.parentElement) {
+    if (row.querySelector('select, [role="combobox"], [role="button"], button, input')) return row;
+  }
+  return null;
+}
+// Does the row already show a chosen value (not the "Seleziona…" placeholder)?
+function rowHasValue(row) {
+  const inp = row.querySelector('input');
+  if (inp && inp.value.trim()) return true;
+  // no "Seleziona…/Scegli…" placeholder left means a value is already chosen —
+  // don't overwrite the user's own pick.
+  return !/seleziona|scegli/.test(norm(row.textContent));
+}
+function triggerOf(row) {
+  const ph = [...row.querySelectorAll('*')].find((e) => e.children.length === 0 && /^(seleziona|scegli)\b/i.test(e.textContent.trim()));
+  return ph?.closest('button, [role="button"], [role="combobox"], div[tabindex], a')
+    || row.querySelector('[role="combobox"], [role="button"], button')
+    || ph?.parentElement || row;
+}
+function optionEls(scope) {
+  return [...scope.querySelectorAll('[role="option"], [data-testid*="option"], li, label, button')]
+    .filter((o) => o.offsetParent !== null && o.textContent.trim() && o.textContent.trim().length < 44);
+}
+// Wait for a menu/list that appeared after the click (not one already open).
+async function waitMenu(before) {
+  for (let i = 0; i < 14; i++) {
+    await sleep2(90);
+    const cands = [...document.querySelectorAll('[role="listbox"], [role="dialog"], [role="menu"], ul')]
+      .filter((e) => !before.has(e) && e.offsetParent !== null && e.getBoundingClientRect().height > 20 && optionEls(e).length >= 1);
+    if (cands.length) return cands[cands.length - 1];
+  }
+  return null;
+}
+const closeMenu = () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); };
+function matchOpt(text, want, mode) {
+  const w = norm(want);
+  if (mode === 'token') return text.split(/[^a-z0-9]+/).includes(w);           // "L" ≠ "XL"
+  if (mode === 'first') return text.split(' ').includes(w.split(' ')[0]) || text.includes(w.split(' ')[0]);
+  return text === w || text.startsWith(w) || w.startsWith(text) || text.includes(w); // phrase
+}
+async function pickField(row, want, mode) {
+  if (rowHasValue(row)) return true;
+  const sel = row.querySelector('select');
+  if (sel) {
+    const opt = [...sel.options].find((o) => matchOpt(norm(o.textContent), want, mode));
+    if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; }
     return false;
+  }
+  const before = new Set(document.querySelectorAll('[role="listbox"], [role="dialog"], [role="menu"], ul'));
+  triggerOf(row).click();
+  const menu = await waitMenu(before);
+  if (!menu) return false;                       // couldn't open — leave it, never guess
+  const hit = optionEls(menu).find((o) => matchOpt(norm(o.textContent), want, mode));
+  if (!hit) { closeMenu(); return false; }
+  hit.click();
+  await sleep2(150);
+  closeMenu();
+  return true;
+}
+async function pickBrand(row, brand) {
+  if (rowHasValue(row)) return true;
+  const inp = row.querySelector('input');
+  if (!inp) return false;
+  const before = new Set(document.querySelectorAll('[role="listbox"], [role="dialog"], [role="menu"], ul'));
+  type(inp, brand);
+  const menu = await waitMenu(before);
+  if (!menu) return false;
+  const hit = optionEls(menu).find((o) => norm(o.textContent).includes(norm(brand)));  // only an exact-ish brand, never a random first row
+  if (!hit) { closeMenu(); return false; }
+  hit.click(); await sleep2(150); closeMenu();
+  return true;
+}
+
+let autoStop = 0;
+function autoFill(it) {
+  autoStop = Date.now() + 180000;
+  const jobs = [
+    { key: 'Prezzo', price: true, val: it.list_price },
+    { key: 'Taglia', label: /^Taglia$/i, val: it.size, mode: 'token' },
+    { key: 'Condizioni', label: /^Condizioni$/i, val: it.condition, mode: 'phrase' },
+    { key: 'Colore', label: /^Color[ie]$/i, val: it.color, mode: 'first' },
+    { key: 'Materiale', label: /Materiale/i, val: it.material, mode: 'first' },
+    { key: 'Marca', label: /^Marca$/i, val: it.brand, brand: true },
+  ].map((j) => ({ ...j, done: !j.val }));   // nothing to set → already "done"
+  let running = false;
+  const finish = () => { obs.disconnect(); clearInterval(iv); const left = jobs.filter((j) => !j.done && j.val).map((j) => j.key); setAutoStatus(left); };
+  const tick = async () => {
+    if (running) return; running = true;
+    try {
+      for (const j of jobs) {
+        if (j.done) continue;
+        if (j.price) { const p = findPrice(); if (p && !p.value) { type(p, String(j.val)); j.done = true; } continue; }
+        const row = fieldRow(j.label);
+        if (!row) continue;                    // not rendered yet
+        j.done = j.brand ? await pickBrand(row, j.val) : await pickField(row, j.val, j.mode);
+      }
+    } finally { running = false; }
+    if (jobs.every((j) => j.done) || Date.now() > autoStop) finish();
   };
-  if (tryFill()) return;
-  priceWatcher = new MutationObserver(tryFill);
-  priceWatcher.observe(document.body, { childList: true, subtree: true });
-  const stop = setTimeout(() => priceWatcher.disconnect(), 180000);  // give up after 3 min
+  const obs = new MutationObserver(() => tick());
+  obs.observe(document.body, { childList: true, subtree: true });
+  const iv = setInterval(tick, 1200);
+  tick();
+}
+function setAutoStatus(left) {
+  const box = document.getElementById('qs-auto');
+  if (!box) return;
+  box.innerHTML = left.length
+    ? `<span style="color:#B4690E">Da mettere a mano: <b>${left.join(', ')}</b> — i valori sono qui sotto.</span>`
+    : `<span style="color:#1F6F6B">Compilato tutto ✓ — controlla e pubblica.</span>`;
 }
 
 function hints(it, missing, photosOk) {
   return `${head('compilato')}
     ${photosOk === false ? `<div style="color:#B4690E;font-size:12px;margin-bottom:6px">Non ho trovato il caricatore foto: aggiungile tu dal telefono o dal computer.</div>` : ''}
     ${missing.length ? `<div style="color:#B4690E;font-size:12px;margin-bottom:6px">Campo non trovato: ${missing.join(', ')} — ho segnalato il modulo all'app.</div>` : ''}
-    <div style="font-size:13px">Scegli tu nei menu di Vinted:</div>
-    <div style="font-size:13px;margin-top:4px;line-height:1.7">
+    <div id="qs-auto" style="font-size:13px;margin:2px 0 8px">Scegli una <b>categoria</b>: poi riempio prezzo, taglia, condizioni, colore, materiale e marca.</div>
+    <div style="font-size:13px;line-height:1.7">
       <b>Categoria</b>: ${esc(it.category_path || '—')}<br>
       <b>Marca</b>: ${esc(it.brand || 'nessuna')}${it.brand_source === 'inferred' ? ' <small>(dedotta)</small>' : ''}<br>
       <b>Taglia</b>: ${esc(it.size || '—')} &nbsp; <b>Condizioni</b>: ${esc(it.condition || '—')}<br>
       <b>Colore</b>: ${esc(it.color || '—')} &nbsp; <b>Materiale</b>: ${esc(it.material || '—')}
     </div>
     <div style="margin-top:10px;font-size:12px;color:#5A6566">Prezzo ${esc(it.list_price)} € · stima ${esc(it.est_price)} € · minimo ${esc(it.floor_price)} €.<br>
-    ${findPrice() ? '' : 'Il campo prezzo compare dopo che scegli la categoria: lo riempio io appena appare.<br>'}
     Quando pubblichi, l'app collega l'annuncio da sola e da lì segue il prezzo.</div>`;
 }
 

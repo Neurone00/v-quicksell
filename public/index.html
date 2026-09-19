@@ -396,8 +396,22 @@ function card(i) {
     <div class="row" style="margin-top:16px">
       <button style="flex:1" onclick="approve(${i.id})">Pubblica su Vinted</button>
       <button class="sec" onclick="act(${i.id},'reject')">Scarta</button>
-    </div></div>`;
+    </div>
+    <details style="margin-top:6px"><summary>Oppure pubblica tu dall'app Vinted</summary>
+      <p style="margin:6px 0 8px">Copia i testi e incollali nell'app Vinted: niente sessione, niente blocchi.</p>
+      <div class="row" style="flex-wrap:wrap;gap:8px">
+        <button class="sec" onclick="copyField('t${i.id}',this)">Copia titolo</button>
+        <button class="sec" onclick="copyField('d${i.id}',this)">Copia descrizione</button>
+        <button class="sec" onclick="copyField('p${i.id}',this)">Copia prezzo</button>
+      </div></details></div>`;
 }
+
+window.copyField = async (id, btn) => {
+  const v = $('#' + id).value;
+  try { await navigator.clipboard.writeText(v); } catch { prompt('Copia:', v); return; }
+  const was = btn.textContent; btn.textContent = 'Copiato ✓';
+  setTimeout(() => { btn.textContent = was; }, 1400);
+};
 
 window.act = async (id, w) => { await api(`/items/${id}/${w}`, { method:'POST' }); refresh(); };
 
@@ -407,7 +421,13 @@ window.approve = async (id) => {
   const r = await api(`/items/${id}/approve`, { method:'POST', body: JSON.stringify({
     title:g('t'), description:g('d'), brand:g('b'), size:g('s'),
     list_price:Number(g('p')), floor_price:Number(g('f')), brand_confirmed:true }) });
-  if (r.error) { alert(r.error); b.disabled = false; b.textContent = 'Pubblica su Vinted'; return; }
+  if (r.error) {
+    b.disabled = false; b.textContent = 'Pubblica su Vinted';
+    alert(/captcha|interstitial|browser/i.test(r.error)
+      ? 'Vinted ha bloccato la pubblicazione automatica per questa volta. Apri "Oppure pubblica tu dall\'app Vinted" qui sotto: copi i testi e pubblichi dall\'app in un minuto.'
+      : r.error);
+    return;
+  }
   refresh();
 };
 

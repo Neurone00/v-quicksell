@@ -68,7 +68,11 @@ export default {
   // The analysis runs here, not in waitUntil: a scheduled invocation gets a real
   // time budget, waitUntil-after-response does not and silently strands the item.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(event.cron === '0 9 * * *' ? priceRound(env) : drainQueue(env));
+    ctx.waitUntil(
+      event.cron === '0 9 * * *'
+        ? V.keepalive(env).then(() => priceRound(env))   // keep the session alive, then reprice
+        : drainQueue(env)
+    );
   },
 };
 
@@ -78,8 +82,10 @@ async function route(p, req, env, ctx) {
 
   if (p === '/api/status') {
     const counts = await db.prepare('SELECT status, COUNT(*) n FROM items GROUP BY status').all();
+    const alive = await V.keepalive(env);
     return json({
-      session: await V.hasSession(env),
+      session: alive.alive,
+      session_reason: alive.reason || null,
       ai: !!env.GEMINI_API_KEY,
       push: !!(await env.KV.get('push_sub')),
       version: env.APP_VERSION,
@@ -145,8 +151,6 @@ async function route(p, req, env, ctx) {
     return json({ total: log.length, endpoints: byPath, recent: log.slice(-40) });
   }
 
-  if (p === '/api/reach') return json(await V.reachability(env));
-
   // Generic authenticated GET, for working out undocumented shapes.
   if (p === '/api/get') {
     const target = url.searchParams.get('path');
@@ -156,21 +160,6 @@ async function route(p, req, env, ctx) {
       return json({ ok: true, body: r });
     } catch (e) {
       return json({ ok: false, error: String(e.message).slice(0, 300) }, 200);
-    }
-  }
-
-  // Deliberately empty item: cannot create anything, but Vinted answers with
-  // the list of fields it requires. Safer than guessing a payload and
-  // accidentally publishing something.
-  if (p === '/api/validate' && req.method === 'POST') {
-    if (url.searchParams.get('browser')) {
-      return json(await V.apiInBrowser(env, '/api/v2/items', { method: 'POST', json: { item: {} } }));
-    }
-    try {
-      const r = await V.vapi(env, '/api/v2/items', { method: 'POST', json: { item: {} } });
-      return json({ unexpected_success: r });
-    } catch (e) {
-      return json({ status: e.status, body: e.body });
     }
   }
 
@@ -255,6 +244,22 @@ async function route(p, req, env, ctx) {
       .bind(JSON.stringify(keys))
       .first();
     return json({ id: r.id });
+  }
+
+  // Android share sheet -> Quicksell. Same as an upload, then back to the app.
+  if (p === '/api/share' && req.method === 'POST') {
+    const form = await req.formData();
+    const files = form.getAll('photos').filter((f) => typeof f !== 'string');
+    if (files.length) {
+      const keys = [];
+      for (const [i, f] of files.entries()) {
+        const key = `${Date.now()}-${i}.jpg`;
+        await env.KV.put(PHOTO + key, await processPhoto(env, f));
+        keys.push(key);
+      }
+      await db.prepare("INSERT INTO items (status, photos) VALUES ('queued', ?)").bind(JSON.stringify(keys)).run();
+    }
+    return Response.redirect(new URL('/?shared=1', req.url).toString(), 303);
   }
 
   const m = p.match(/^\/api\/items\/(\d+)\/(\w+)$/);

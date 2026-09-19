@@ -45,35 +45,40 @@ npm run deploy
 Open `https://<your-worker>.workers.dev/?k=<APP_SECRET>` once — it sets a cookie
 and you won't need the key again on that device. On Android: menu → Add to home screen.
 
-### 4. Finish in the app
+### 4. Connect Vinted — once, ever
 
-Open it and the onboarding walks you through three steps, once:
+The session refreshes itself: Vinted's access token lasts 2 hours and its
+refresh token 7 days, but every refresh issues a new 7-day one. The daily cron
+(and every app open) touches it, so **you connect once and never again**.
 
-1. **Gemini key** — paste it in (free from aistudio.google.com/apikey). Stored in KV.
-2. **Vinted** — paste your cookie string. Do this **from a computer**: open vinted.it
-   logged in, F12, Console, `document.cookie`, copy. The session lives server-side,
-   so your phone never repeats it.
-3. **Notifications** — one tap.
+Three ways to connect, pick one:
 
-Once done the onboarding never returns; the ⚙ in the header reopens it.
+- **In the app** (phone only): Collega → Vinted opens inside the app → sign in
+  with **e-mail and password**. Google/Apple/Facebook are blocked there — Google
+  refuses automated browsers. If your account was created with Google, set a
+  password once via "Password dimenticata" on vinted.it.
+- **As a secret** (never touches a chat): on a computer signed into vinted.it,
+  F12 → Network → reload → click the first `vinted.it` row → Request Headers →
+  copy the whole `Cookie:` value. Then:
+  ```bash
+  npx wrangler secret put VINTED_COOKIE
+  ```
+  Paste at the hidden prompt. The app seeds its session from it on first use.
+  (`document.cookie` in the Console does NOT work — the session cookies are
+  HttpOnly and invisible to JavaScript.)
+- **Paste in the app**: same Network-tab string, via the link under Collega.
 
-`GEMINI_API_KEY` also works as a Wrangler secret if you prefer the terminal —
-the secret wins over the in-app value.
+### 5. Notifications
 
-**Your Vinted password never touches this app.** The session expires every few weeks —
-the app will tell you when to re-paste.
+One tap in the onboarding. That's the whole setup.
 
-### 5. Verify the Vinted API shapes — do this before your first real listing
+### Plan B — publish from the Vinted app yourself
 
-```bash
-curl "https://<your-worker>.workers.dev/api/probe?k=<APP_SECRET>"
-```
-
-This confirms the session works and reports which sold-flag Vinted currently
-exposes. **Vinted has no public API and renames internal fields without notice** —
-if `search_ok` is false or `sold_flag_present` is empty, the field names in
-`src/vinted.js` need updating against `sample_keys`. That file is the only one
-that ever needs to change.
+Every approved listing has **Copia titolo / descrizione / prezzo** buttons. And
+Quicksell registers as an Android **share target**: select photos in your
+gallery → Share → Quicksell, and the draft is ready when you open the app.
+Paste into Vinted's own app and publish. No session, no bot detection, nothing
+to break — you lose only the automatic price decay, which needs the API.
 
 ### 6. Android APK (optional — the PWA already works)
 
@@ -120,9 +125,12 @@ The code already falls back to a lite model when the primary is overloaded.
 
 - **Free plan gives ~10 browser-minutes/day.** Each analysis and each daily price
   round opens a browser. Fine for <20 items; upgrade to Workers Paid if you scale.
-- **Cloudflare IPs are datacenter IPs.** Vinted may throw a captcha or invalidate
-  the session more often than it would from your home connection. If it becomes
-  constant, `src/vinted.js` is the only file that moves to a local runner.
+- **Datadome challenges writes from plain fetch.** Reads (comparables, stats)
+  pass from Cloudflare's IPs; creating or repricing a listing gets a captcha
+  interstitial. Writes therefore fall back to a real browser page, which
+  Datadome accepts — at ~15-20s of Browser Rendering per write. On the Free
+  plan (~10 min/day) that is roughly 30 writes a day. Workers Paid removes the
+  ceiling. If a write is still blocked, the app says so and points at Plan B.
 - **Automating Vinted is against their ToS.** Worst case is account suspension.
 - Sold *transaction* prices aren't public — Vinted shows the last asking price
   even when an item sold via an accepted private offer. The pricing prompt

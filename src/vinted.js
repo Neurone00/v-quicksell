@@ -265,7 +265,7 @@ export async function browserReap(env) {
 }
 
 export async function hasSession(env) {
-  return !!(await env.KV.get(SESSION_KEY));
+  return !!(await loadJar(env));
 }
 
 function parseCookieString(s, host) {
@@ -294,10 +294,41 @@ function parseCookieString(s, host) {
 // blocked — so posting and price updates should cost no browser time either.
 // ---------------------------------------------------------------------------
 
+// The jar lives in KV because refresh rotates it. VINTED_COOKIE (a Wrangler
+// secret) only seeds it: set once from a terminal, hidden prompt, never chat.
+async function loadJar(env) {
+  let jar = JSON.parse((await env.KV.get(SESSION_KEY)) || 'null');
+  if (!jar && env.VINTED_COOKIE) {
+    jar = parseCookieString(env.VINTED_COOKIE, env.VINTED_HOST);
+    if (jar.find((c) => /session|access_token/.test(c.name))) {
+      await env.KV.put(SESSION_KEY, JSON.stringify(jar));
+    } else jar = null;
+  }
+  return jar;
+}
+
 async function cookieHeader(env) {
-  const jar = JSON.parse((await env.KV.get(SESSION_KEY)) || 'null');
+  const jar = await loadJar(env);
   if (!jar) throw new Error('NO_SESSION');
   return jar.map((c) => `${c.name}=${c.value}`).join('; ');
+}
+
+// Called daily by the cron and on every app open. The refresh token lasts seven
+// days and each refresh issues a new one, so touching it daily keeps the session
+// alive forever. Returns what the UI needs to say if it cannot.
+export async function keepalive(env) {
+  let cookie;
+  try { cookie = await cookieHeader(env); } catch { return { alive: false, reason: 'NO_SESSION' }; }
+  const ref = /refresh_token_web=([^;]+)/.exec(cookie)?.[1];
+  const exp = ref ? jwtExp(ref) : null;
+  const daysLeft = exp ? (exp - Date.now() / 1000) / 86400 : 0;
+  if (daysLeft <= 0) { await env.KV.delete(SESSION_KEY); return { alive: false, reason: 'SESSION_EXPIRED' }; }
+  // Refresh when the access token is stale or the refresh token is under 5 days.
+  if (accessExpired(cookie) || daysLeft < 5) {
+    try { await refreshSession(env); }
+    catch { await env.KV.delete(SESSION_KEY); return { alive: false, reason: 'SESSION_EXPIRED' }; }
+  }
+  return { alive: true };
 }
 
 // Vinted wants a CSRF token on writes. It is NOT a <meta> tag — it lives in the
@@ -370,6 +401,10 @@ async function refreshSession(env) {
   return true;
 }
 
+const jwtExp = (jwt) => {
+  try { return JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp; } catch { return null; }
+};
+
 // Cheap pre-flight: the JWT carries its own expiry, so a doomed call can be
 // avoided rather than spent discovering it is doomed.
 function accessExpired(cookie) {
@@ -420,39 +455,6 @@ export async function vapi(env, path, init = {}, retried = false) {
   }
   return body;
 }
-
-// Is the API reachable from the Worker at all, with and without a session?
-// Answers the question the browser cost hangs on.
-export async function reachability(env) {
-  const probe = async (path, withCookie) => {
-    const t0 = Date.now();
-    try {
-      const headers = { 'user-agent': UA, accept: 'application/json, text/plain, */*',
-        referer: `https://${env.VINTED_HOST}/` };
-      if (withCookie) headers.cookie = await cookieHeader(env).catch(() => '');
-      const r = await fetch(`https://${env.VINTED_HOST}${path}`, {
-        headers, signal: AbortSignal.timeout(20000),
-      });
-      const body = (await r.text()).slice(0, 120);
-      return { path, auth: !!withCookie, status: r.status, ms: Date.now() - t0,
-        challenged: /challenge-platform|cf-mitigated|Just a moment/i.test(body) };
-    } catch (e) {
-      return { path, auth: !!withCookie, error: String(e.message).slice(0, 80), ms: Date.now() - t0 };
-    }
-  };
-  const hasSess = await hasSession(env);
-  const paths = ['/api/v2/users/current', '/api/v2/catalog/items?search_text=nike&per_page=3'];
-  const out = [];
-  for (const p of paths) {
-    out.push(await probe(p, false));
-    if (hasSess) out.push(await probe(p, true));
-  }
-  return { session: hasSess, results: out };
-}
-
-// ---------------------------------------------------------------------------
-// Operations
-// ---------------------------------------------------------------------------
 
 // Comparables without a browser at all.
 //
@@ -528,7 +530,28 @@ export async function findCategory() {
   return null;
 }
 
-// Uploads photos, then creates the listing — all over plain fetch. No browser:
+// Datadome lets reads through from a datacenter IP but answers writes with a
+// captcha interstitial. The same request from inside a real browser page is
+// not challenged, so a write tries plain fetch and falls back to a browser.
+const isChallenge = (e) =>
+  e.status === 403 && /captcha-delivery|interstitial/.test(JSON.stringify(e.body || ''));
+
+async function write(env, path, init) {
+  try {
+    return await vapi(env, path, init);
+  } catch (e) {
+    if (!isChallenge(e)) throw e;
+    const r = await apiInBrowser(env, path, init);
+    if (r.status >= 400) {
+      const err = new Error(`vinted ${init.method} ${path} -> ${r.status} (browser): ${JSON.stringify(r.body).slice(0, 220)}`);
+      err.status = r.status; err.body = r.body;
+      throw err;
+    }
+    return r.body;
+  }
+}
+
+// Uploads photos, then creates the listing. No browser:
 // a Worker can POST multipart straight from KV, which is simpler than pulling
 // the images back into a browser page just to upload them again.
 export async function createListing(env, item, photos) {
@@ -541,7 +564,7 @@ export async function createListing(env, item, photos) {
     uploaded.push(res.id ?? res.photo?.id);
   }
 
-  const created = await vapi(env, '/api/v2/items', {
+  const created = await write(env, '/api/v2/items', {
     method: 'POST',
     json: {
       item: {
@@ -563,7 +586,7 @@ export async function createListing(env, item, photos) {
 }
 
 export async function updatePrice(env, vintedId, price) {
-  await vapi(env, `/api/v2/items/${vintedId}`, {
+  await write(env, `/api/v2/items/${vintedId}`, {
     method: 'PUT',
     json: { item: { price: String(price) } },
   });
@@ -580,46 +603,6 @@ export async function fetchStats(env, vintedId) {
     sold: Boolean(it.is_sold ?? it.is_closed ?? false),
     price: Number(it.price?.amount ?? it.price ?? 0),
   };
-}
-
-// Setup helper: confirms the session works and the API shapes above still match.
-// The access token lasts two hours; the refresh token seven days. Without a
-// refresh the app is dead between one session and the next daily cron, so this
-// finds the endpoint that mints a new one.
-export async function findRefresh(env) {
-  const cookie = await cookieHeader(env);
-  const token = /refresh_token_web=([^;]+)/.exec(cookie)?.[1] || '';
-  const candidates = [
-    ['POST', '/api/v2/token_refresh', null],
-    ['POST', '/oauth/token', { grant_type: 'refresh_token', refresh_token: token, client_id: 'web' }],
-    ['POST', '/web/api/auth/refresh', null],
-    ['POST', '/api/v2/sessions/refresh', null],
-    ['POST', '/api/v2/tokens/refresh', null],
-    ['POST', '/api/v2/users/refresh_token', null],
-  ];
-  const out = [];
-  for (const [method, path, body] of candidates) {
-    try {
-      const r = await fetch(`https://${env.VINTED_HOST}${path}`, {
-        method,
-        headers: {
-          cookie, 'user-agent': UA, accept: 'application/json, text/plain, */*',
-          referer: `https://${env.VINTED_HOST}/`,
-          'x-csrf-token': await csrf(env, cookie),
-          ...(body ? { 'content-type': 'application/json' } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(20000),
-      });
-      const setCookie = r.headers.get('set-cookie') || '';
-      out.push({
-        path, status: r.status,
-        sets_access_token: /access_token_web=/.test(setCookie),
-        body: (await r.text()).slice(0, 120),
-      });
-    } catch (e) { out.push({ path, error: String(e.message).slice(0, 80) }); }
-  }
-  return out;
 }
 
 export async function probe(env, query, testPhoto) {

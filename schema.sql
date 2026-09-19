@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS items (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       TEXT NOT NULL DEFAULT 'owner',
   status        TEXT NOT NULL DEFAULT 'analyzing',
   -- queued | analyzing | needs_input | pending | ready | live | sold | archived | error
   photos        TEXT NOT NULL,          -- JSON array of R2 keys
@@ -33,3 +34,4 @@ CREATE TABLE IF NOT EXISTS items (
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_status ON items(status);
+CREATE INDEX IF NOT EXISTS idx_user ON items(user_id, status);

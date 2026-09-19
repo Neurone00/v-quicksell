@@ -28,8 +28,10 @@ async function vapidJwt(env, audience) {
   return unsigned + '.' + b64url(sig);
 }
 
-export async function notify(env) {
-  const sub = JSON.parse((await env.KV.get('push_sub')) || 'null');
+export async function notify(env, user = 'owner') {
+  const key = `push_sub:${user}`;
+  let sub = JSON.parse((await env.KV.get(key)) || 'null');
+  if (!sub && user === 'owner') sub = JSON.parse((await env.KV.get('push_sub')) || 'null');   // pre-accounts key
   if (!sub || !env.VAPID_JWK) return false;
   const jwt = await vapidJwt(env, new URL(sub.endpoint).origin);
   const r = await fetch(sub.endpoint, {
@@ -40,6 +42,6 @@ export async function notify(env) {
       Authorization: `vapid t=${jwt}, k=${env.VAPID_PUBLIC}`,
     },
   });
-  if (r.status === 404 || r.status === 410) await env.KV.delete('push_sub'); // subscription dead
+  if (r.status === 404 || r.status === 410) { await env.KV.delete(key); await env.KV.delete('push_sub'); } // subscription dead
   return r.ok;
 }

@@ -11,13 +11,55 @@ const json = (o, status = 200) =>
   new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
 
 // ---------------------------------------------------------------------------
-// Auth. One shared secret in a cookie or ?k=. There is exactly one user.
+// Auth. A key in ?k= or the qs cookie resolves to a user. APP_SECRET is the
+// owner; further users are minted by the owner and live in KV as key -> name.
+// Every draft, notification and drop belongs to one user, so a test account's
+// listings never end up in the real account's batch.
 // ---------------------------------------------------------------------------
-function authed(req, env) {
-  if (!env.APP_SECRET) return true;
-  const url = new URL(req.url);
-  if (url.searchParams.get('k') === env.APP_SECRET) return true;
-  return (req.headers.get('cookie') || '').includes(`qs=${env.APP_SECRET}`);
+const keyOf = (req) => {
+  const k = new URL(req.url).searchParams.get('k');
+  return k || ((req.headers.get('cookie') || '').match(/(?:^|;\s*)qs=([^;]+)/) || [])[1] || null;
+};
+// Cloudflare Access in front of the app (Google sign-in or one-time PIN): the
+// Worker verifies Access's signed token against the team's public keys and the
+// user is their e-mail. Off until ACCESS_TEAM and ACCESS_AUD are set.
+const b64u = (s) => atob(s.replace(/-/g, '+').replace(/_/g, '/'));
+async function accessCerts(env) {
+  const cached = await env.KV.get('access_certs', 'json');
+  if (cached) return cached;
+  const r = await fetch(`https://${env.ACCESS_TEAM}.cloudflareaccess.com/cdn-cgi/access/certs`, { signal: AbortSignal.timeout(10000) });
+  const j = await r.json();
+  await env.KV.put('access_certs', JSON.stringify(j), { expirationTtl: 3600 });
+  return j;
+}
+async function accessUser(req, env) {
+  if (!env.ACCESS_TEAM || !env.ACCESS_AUD) return null;
+  const jwt = req.headers.get('cf-access-jwt-assertion')
+    || ((req.headers.get('cookie') || '').match(/CF_Authorization=([^;]+)/) || [])[1];
+  if (!jwt) return null;
+  try {
+    const [h, p, sig] = jwt.split('.');
+    const header = JSON.parse(b64u(h)), payload = JSON.parse(b64u(p));
+    const aud = [].concat(payload.aud || []);
+    if (!aud.includes(env.ACCESS_AUD) || !(payload.exp > Date.now() / 1000) || !payload.email) return null;
+    const jwk = (await accessCerts(env)).keys?.find((k) => k.kid === header.kid);
+    if (!jwk) return null;
+    const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+    const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key,
+      Uint8Array.from(b64u(sig), (c) => c.charCodeAt(0)), new TextEncoder().encode(`${h}.${p}`));
+    return ok ? payload.email.toLowerCase() : null;
+  } catch { return null; }
+}
+
+async function userOf(req, env) {
+  if (!env.APP_SECRET) return 'owner';
+  const viaAccess = await accessUser(req, env);
+  if (viaAccess) return viaAccess;
+  const k = keyOf(req);
+  if (!k) return null;
+  if (k === env.APP_SECRET) return 'owner';
+  const users = JSON.parse((await env.KV.get('users')) || '{}');
+  return users[k] || null;
 }
 
 async function photoToken(env, key) {
@@ -33,7 +75,7 @@ export default {
     if (!p.startsWith('/api/')) {
       const res = await env.ASSETS.fetch(req);
       const k = url.searchParams.get('k');
-      if (k && k === env.APP_SECRET) {
+      if (k && (await userOf(req, env))) {
         const r = new Response(res.body, res);
         r.headers.append('set-cookie', `qs=${k}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax`);
         return r;
@@ -43,7 +85,10 @@ export default {
 
     if (p.startsWith('/api/photo/')) {
       const key = decodeURIComponent(p.slice('/api/photo/'.length));
-      const ok = authed(req, env) || url.searchParams.get('t') === (await photoToken(env, key));
+      const user = await userOf(req, env);
+      const mine = user && (await env.DB.prepare("SELECT 1 FROM items WHERE user_id=? AND photos LIKE ?")
+        .bind(user, `%"${key}"%`).first());
+      const ok = mine || url.searchParams.get('t') === (await photoToken(env, key));
       if (!ok) return new Response('no', { status: 403 });
       const buf = await env.KV.get(PHOTO + key, 'arrayBuffer');
       if (!buf) return new Response('not found', { status: 404 });
@@ -51,10 +96,11 @@ export default {
     }
 
     if (p === '/api/version') return json({ version: env.APP_VERSION });
-    if (!authed(req, env)) return json({ error: 'unauthorized' }, 401);
+    const user = await userOf(req, env);
+    if (!user) return json({ error: 'unauthorized' }, 401);
 
     try {
-      return await route(p, req, env, ctx, url);
+      return await route(p, req, env, ctx, url, user);
     } catch (e) {
       return json({ error: String(e.message || e) }, 500);
     }
@@ -72,14 +118,15 @@ const parseItem = (r) => ({
   comparables: r.comparables ? JSON.parse(r.comparables) : null,
 });
 
-async function route(p, req, env, ctx, url) {
+async function route(p, req, env, ctx, url, user) {
   const db = env.DB;
 
   if (p === '/api/status') {
-    const counts = await db.prepare('SELECT status, COUNT(*) n FROM items GROUP BY status').all();
+    const counts = await db.prepare('SELECT status, COUNT(*) n FROM items WHERE user_id=? GROUP BY status').bind(user).all();
     return json({
+      user,
       ai: !!env.GEMINI_API_KEY,
-      push: !!(await env.KV.get('push_sub')),
+      push: !!(await env.KV.get(`push_sub:${user}`)) || (user === 'owner' && !!(await env.KV.get('push_sub'))),
       version: env.APP_VERSION,
       apk_version: env.APK_VERSION,
       vapid_public: env.VAPID_PUBLIC,
@@ -88,7 +135,7 @@ async function route(p, req, env, ctx, url) {
   }
 
   if (p === '/api/push/subscribe' && req.method === 'POST') {
-    await env.KV.put('push_sub', JSON.stringify(await req.json()));
+    await env.KV.put(`push_sub:${user}`, JSON.stringify(await req.json()));
     return json({ ok: true });
   }
 
@@ -99,7 +146,7 @@ async function route(p, req, env, ctx, url) {
        WHERE status='analyzing' AND (started_at IS NULL OR (julianday('now') - julianday(started_at)) * 1440 > 3)`
     ).run();
     const { results } = await db
-      .prepare("SELECT * FROM items WHERE status != 'archived' ORDER BY id DESC LIMIT 100").all();
+      .prepare("SELECT * FROM items WHERE user_id=? AND status != 'archived' ORDER BY id DESC LIMIT 100").bind(user).all();
     return json({ items: results.map(parseItem) });
   }
 
@@ -116,11 +163,11 @@ async function route(p, req, env, ctx, url) {
         await env.KV.put(PHOTO + key, await processPhoto(env, f));
         keys.push(key);
       }
-      ({ id } = await db.prepare("INSERT INTO items (status, photos) VALUES ('queued', ?) RETURNING id")
-        .bind(JSON.stringify(keys)).first());
+      ({ id } = await db.prepare("INSERT INTO items (status, photos, user_id) VALUES ('queued', ?, ?) RETURNING id")
+        .bind(JSON.stringify(keys), user).first());
     } else if (V.vintedIdFromUrl(sharedUrl)) {
       // Sharing a published listing back from the Vinted app links it to the newest ready draft.
-      const ready = await db.prepare("SELECT id FROM items WHERE status='ready' ORDER BY id DESC LIMIT 1").first();
+      const ready = await db.prepare("SELECT id FROM items WHERE user_id=? AND status='ready' ORDER BY id DESC LIMIT 1").bind(user).first();
       if (ready) await markPublished(env, ready.id, sharedUrl);
     }
     if (p === '/api/share') return Response.redirect(new URL('/?shared=1', req.url).toString(), 303);
@@ -132,14 +179,14 @@ async function route(p, req, env, ctx, url) {
 
   // What the extension fills on the computer: approved drafts, photos included.
   if (p === '/api/ready') {
-    const { results } = await db.prepare("SELECT * FROM items WHERE status='ready' ORDER BY id DESC").all();
+    const { results } = await db.prepare("SELECT * FROM items WHERE user_id=? AND status='ready' ORDER BY id DESC").bind(user).all();
     return json({ items: results.map(parseItem) });
   }
 
   // Drops due now. The app never changes a price itself: it says what to set.
   if (p === '/api/due') {
     const { results } = await db
-      .prepare("SELECT * FROM items WHERE status='live' AND due_price IS NOT NULL ORDER BY next_drop_at").all();
+      .prepare("SELECT * FROM items WHERE user_id=? AND status='live' AND due_price IS NOT NULL ORDER BY next_drop_at").bind(user).all();
     return json({ items: results.map(parseItem) });
   }
 
@@ -179,6 +226,22 @@ async function route(p, req, env, ctx, url) {
       .map((m) => m.name.replace('models/', '')));
   }
 
+  // Accounts. Owner only: mint a key for another person or a test setup.
+  if (p === '/api/users') {
+    if (user !== 'owner') return json({ error: 'solo il proprietario' }, 403);
+    const users = JSON.parse((await env.KV.get('users')) || '{}');
+    if (req.method === 'POST') {
+      const { name } = await req.json().catch(() => ({}));
+      const clean = String(name || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      if (!clean || clean === 'owner') return json({ error: 'nome non valido' }, 400);
+      const key = [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, '0')).join('');
+      users[key] = clean;
+      await env.KV.put('users', JSON.stringify(users));
+      return json({ name: clean, key, url: `${env.PUBLIC_URL}/?k=${key}` });
+    }
+    return json({ users: ['owner', ...new Set(Object.values(users))] });
+  }
+
   if (p === '/api/probe') {
     const comps = await V.searchComparables(env, url.searchParams.get('q') || 'nike felpa', 10);
     return json({ comparables_found: comps.length, comparables_sample: comps.slice(0, 3) });
@@ -187,7 +250,7 @@ async function route(p, req, env, ctx, url) {
   const m = p.match(/^\/api\/items\/(\d+)\/(\w+)$/);
   if (m) {
     const id = Number(m[1]);
-    const item = await db.prepare('SELECT * FROM items WHERE id = ?').bind(id).first();
+    const item = await db.prepare('SELECT * FROM items WHERE id = ? AND user_id = ?').bind(id, user).first();
     if (!item) return json({ error: 'not found' }, 404);
 
     if (m[2] === 'approve') return json(await approve(env, item, await req.json().catch(() => ({}))));
@@ -260,7 +323,7 @@ async function analyse(env, id) {
 
     // Our own sales are the only true settled prices we have.
     const { results: mine } = await db
-      .prepare("SELECT title, brand, size, condition, current_price FROM items WHERE status='sold' LIMIT 20").all();
+      .prepare("SELECT title, brand, size, condition, current_price FROM items WHERE user_id=? AND status='sold' LIMIT 20").bind(item.user_id).all();
     const ownSold = mine.map((r) => ({ title: r.title, brand: r.brand, size: r.size, condition: r.condition, price: r.current_price, sold: true }));
 
     let comparables = [], compsError = null;
@@ -286,7 +349,7 @@ async function analyse(env, id) {
       compsError ? `Nessun comparabile: ${compsError}` : comparables.length === 0 ? `Nessun comparabile trovato per "${a.search_query}".` : null,
       id
     ).run();
-    await notify(env);
+    await notify(env, item.user_id);
   } catch (e) {
     await fail(String(e.message || e).slice(0, 400));
   }
@@ -322,7 +385,7 @@ async function markPublished(env, id, vintedUrl) {
 async function dailyRound(env) {
   const db = env.DB;
   const { results } = await db.prepare("SELECT * FROM items WHERE status='live' AND vinted_url IS NOT NULL").all();
-  let due = 0;
+  const dueFor = new Set();
   for (const it of results) {
     try {
       const t = await V.trackItem(env, it.vinted_url);
@@ -332,14 +395,14 @@ async function dailyRound(env) {
       }
       const isDue = it.due_price == null && it.next_drop_at && new Date(it.next_drop_at + 'Z') <= new Date();
       const next = isDue ? nextPrice(it.current_price, it.floor_price, Number(env.DROP_PCT)) : null;
-      if (next) due++;
+      if (next) dueFor.add(it.user_id);
       await db.prepare('UPDATE items SET views=COALESCE(?,views), favourites=COALESCE(?,favourites), due_price=COALESCE(?,due_price) WHERE id=?')
         .bind(t.views, t.favourites, next, it.id).run();
     } catch (e) {
       await db.prepare('UPDATE items SET note=? WHERE id=?').bind(String(e.message).slice(0, 200), it.id).run();
     }
   }
-  if (due) await notify(env);
+  for (const u of dueFor) await notify(env, u);
 }
 
 function bufToB64(buf) {

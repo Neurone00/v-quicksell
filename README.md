@@ -76,6 +76,29 @@ the app (`GET /api/learned`). Vinted's form is React-rendered and undocumented,
 so if a field is not found the panel says which one; the selector table at the
 top of `extension/content.js` is where to fix it.
 
+## Accounts
+
+Every draft, notification and price drop belongs to one user, so a test account's
+listings never land in the real account's batch. Two ways to be a user:
+
+**A key** — works now, no setup.
+```bash
+npm run user -- add test
+```
+prints a login link. Open it once on that device; put the same key in the
+extension's popup. Your original `APP_SECRET` is the owner.
+
+**Google sign-in** — no Firebase, no code: Cloudflare Access. Zero Trust
+dashboard → Access → Applications → Self-hosted → the app's hostname → identity
+provider Google (or the built-in one-time PIN by e-mail, which needs nothing) →
+policy: your e-mails. Then set `ACCESS_TEAM` (your team name) and `ACCESS_AUD`
+(the application's audience tag) in `wrangler.jsonc` and redeploy. The Worker
+verifies Access's signed token and the user *is* their e-mail. Keys keep
+working alongside it for the extension and scripts.
+
+The app never has a Vinted account. Publish from whichever Vinted account is
+logged in; the listing's public page is what gets tracked.
+
 ## Tuning
 
 `wrangler.jsonc` vars: `BUMP_PCT` (50), `DROP_PCT` (5), `DROP_EVERY_DAYS` (3).

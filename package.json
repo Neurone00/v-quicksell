@@ -9,7 +9,8 @@
     "db:init": "wrangler d1 execute quicksell --remote --file=schema.sql",
     "vapid": "node scripts/vapid.mjs",
     "check": "node scripts/check.mjs && node test.mjs",
-    "release": "bash scripts/release.sh"
+    "release": "bash scripts/release.sh",
+    "user": "bash scripts/user.sh"
   },
   "devDependencies": {
     "wrangler": "^4.135.0"

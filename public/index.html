@@ -465,13 +465,17 @@ window.relayStop = async () => {
 };
 
 window.cookieFallback = async () => {
+  // document.cookie does NOT work here: Vinted marks its session cookies
+  // HttpOnly, so JavaScript cannot see them. The request header can.
   const c = prompt(
     'Da computer, una volta sola:\n\n' +
     '1. Apri vinted.it e accedi come fai di solito (Google va benissimo).\n' +
-    '2. Premi F12, scheda Console.\n' +
-    '3. Scrivi:  document.cookie\n' +
-    '4. Copia tutto il risultato e incollalo qui.\n\n' +
-    'Dopo questo il telefono funziona da solo: la sessione resta sul server.'
+    '2. Premi F12 e vai su Rete / Network.\n' +
+    '3. Ricarica la pagina e clicca la prima riga (vinted.it).\n' +
+    '4. In Intestazioni / Headers cerca "Cookie:" fra le intestazioni della richiesta.\n' +
+    '5. Copia TUTTO il valore e incollalo qui.\n\n' +
+    'Nota: la Console con document.cookie NON funziona — i cookie di sessione\n' +
+    'sono HttpOnly e Javascript non li vede.'
   );
   if (!c) return;
   const r = await api('/session', { method:'POST', body: JSON.stringify({ cookie: c.trim() }) });

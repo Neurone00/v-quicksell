@@ -17,7 +17,15 @@ const SESSION_KEY = 'vinted_session';
 export async function saveSession(env, cookieString) {
   const cookies = parseCookieString(cookieString, env.VINTED_HOST);
   if (!cookies.find((c) => /session|access_token/.test(c.name))) {
-    throw new Error('Nessun cookie di sessione trovato. Serve almeno _vinted_fr_session o access_token_web.');
+    // Almost always means document.cookie was used: Vinted's session cookies are
+    // HttpOnly, so JS cannot read them and the paste arrives without the only
+    // part that matters. Say that, rather than a generic failure.
+    throw new Error(
+      `Ricevuti ${cookies.length} cookie, ma nessuno di sessione. ` +
+      'Probabilmente hai usato document.cookie nella Console: i cookie di sessione ' +
+      'di Vinted sono HttpOnly e Javascript non li vede. Prendili dalla scheda Rete: ' +
+      'ricarica vinted.it, clicca la prima richiesta e copia l\'intestazione "Cookie:".'
+    );
   }
   await env.KV.put(SESSION_KEY, JSON.stringify(cookies));
   return cookies.length;

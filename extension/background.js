@@ -91,13 +91,13 @@ const waitResult = (id, ms) => new Promise((res) => {
 const say = (message) => chrome.notifications.create({ type: 'basic', iconUrl: 'icon.png', title: 'Quicksell', message });
 
 let running = false;
-async function runBatch() {
+async function runBatch({ quiet = false } = {}) {
   if (running) return;
   running = true;
   let win = null;
   try {
     const { items } = await api('/api/due');
-    if (!items?.length) return say('Niente da ribassare.');
+    if (!items?.length) { if (!quiet) say('Niente da ribassare.'); return; }
     win = await chrome.windows.create({ url: 'about:blank', focused: false, state: 'minimized' });
     let done = 0; const failed = [];
     for (const it of items) {
@@ -138,17 +138,9 @@ async function runBatch() {
   }
 }
 
-// Once a day: what is due, with a button to do it all.
+// Once a day, and whenever Chrome starts (a day missed while it was closed gets
+// done then): if anything is due, just do it. The user asked not to be asked.
+// runBatch says nothing unless there is something to report at the end.
 chrome.alarms.create('due', { periodInMinutes: 60 * 24 });
-chrome.alarms.onAlarm.addListener(async () => {
-  try {
-    const { items } = await api('/api/due');
-    if (!items?.length) return;
-    chrome.notifications.create('due', {
-      type: 'basic', iconUrl: 'icon.png', title: 'Quicksell', requireInteraction: true,
-      message: items.length === 1 ? `${items[0].title}: scendi a ${items[0].due_price} €` : `${items.length} articoli da ribassare`,
-      buttons: [{ title: items.length === 1 ? 'Ribassa' : `Ribassa tutti (${items.length})` }],
-    });
-  } catch {}
-});
-chrome.notifications.onButtonClicked.addListener((id) => { if (id === 'due') runBatch(); });
+chrome.alarms.onAlarm.addListener(() => runBatch({ quiet: true }));
+chrome.runtime.onStartup.addListener(() => runBatch({ quiet: true }));

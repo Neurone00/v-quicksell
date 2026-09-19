@@ -168,12 +168,38 @@ async function onLocalPhotos(files) {
 
   if (/\/items\/\d+\/edit/.test(location.pathname)) {
     const id = location.pathname.match(/\/items\/(\d+)/)[1];
+    const fmt = (n) => String(n).replace('.', ',');
+
+    // In a batch? The background holds which listing it opened and at what price.
+    const b = await send({ type: 'batchInfo' });
+    const batch = b?.ok && b.data && b.data.vintedId === id ? b.data : null;
+
+    if (batch) {
+      const p = find(FIELDS.price);
+      const save = [...document.querySelectorAll('button')].find((el) => /^(salva|aggiorna|conferma|salva modifiche)$/i.test(el.textContent.trim()))
+        || document.querySelector('button[type="submit"]');
+      if (!p || !save) {
+        show(`${head('ribasso')}Prezzo da impostare: <b>${fmt(batch.price)} €</b>.<div class="pw" style="color:#B4690E;font-size:12px;margin-top:8px">Non ho trovato ${!p ? 'il campo prezzo' : 'il pulsante Salva'}: finisci tu questo.</div>`);
+        learn();
+        send({ type: 'batchResult', id: batch.id, ok: false, reason: !p ? 'campo prezzo' : 'pulsante Salva' });
+        return;
+      }
+      type(p, fmt(batch.price));
+      show(`${head('ribasso automatico')}Salvo <b>${fmt(batch.price)} €</b>…`);
+      await sleep(700);
+      save.click();
+      await sleep(2500);
+      const err = /errore|non valido|riprova/i.test(document.body.innerText);
+      send({ type: 'batchResult', id: batch.id, ok: !err, reason: err ? 'Vinted ha segnalato un errore' : null });
+      return;
+    }
+
     const r = await send({ type: 'api', path: '/api/due', method: 'GET' });
     const due = r?.ok && (r.data.items || []).find((x) => String(x.vinted_id) === id);
     if (due) {
       const p = find(FIELDS.price);
-      if (p) type(p, String(due.due_price).replace('.', ','));
-      show(`${head('ribasso')}Prezzo impostato a <b>${due.due_price} €</b> (era ${due.current_price} €, minimo ${due.floor_price} €).<br><small>Salva su Vinted e segno il ribasso come fatto.</small>`);
+      if (p) type(p, fmt(due.due_price));
+      show(`${head('ribasso')}Prezzo impostato a <b>${fmt(due.due_price)} €</b> (era ${fmt(due.current_price)} €, minimo ${fmt(due.floor_price)} €).<br><small>Salva su Vinted e segno il ribasso come fatto.</small>`);
       document.addEventListener('submit', () => send({ type: 'api', path: `/api/items/${due.id}/dropped`, method: 'POST', body: {} }), true);
     }
   } else {

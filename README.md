@@ -20,7 +20,7 @@ ban, and nothing to expire.
 | computer | open vinted.it → Vendi. The extension lists your approved drafts; **Compila** drops the photos into Vinted's uploader and types title, description and price |
 | you | pick category, brand, size, condition in Vinted's menus; click Pubblica |
 | app | sees the new listing and tracks it: views, favourites, sold |
-| every 3 days | a notification: "*Vestito Zara*: scendi a 8,55 €" → one click opens the listing, the extension sets the price, you save |
+| every 3 days | a notification: "*Vestito Zara*: scendi a 8,59 €" — **Ribassa tutti** does every due listing in a minimized window, one every 5–15 s, and tells you the count. Or open each one yourself: the price is pre-filled, you press Salva |
 
 Listed at fair value **+50%**, dropped **−5% every 3 days**, never below the floor. Every price ends in **,X9** (8,59 not 8,55; 8,99 not 9).
 
@@ -73,6 +73,14 @@ At the defaults an item takes **~54 days** from list price to floor.
 Google retires model ids without warning. `GET /api/models?k=...` lists what
 your key can use; `&test=1` times the candidates. Set the healthy one as
 `GEMINI_MODEL`. The code falls back to a lite model when the primary is overloaded.
+
+## The one automated write
+
+Batch price drops press Salva for you. It runs in your own Chrome with your own
+session, so Vinted sees a person editing their own prices — but it *is* the
+extension pressing the button, with random 5–15 s gaps so it never looks like a
+script. Very low risk, not zero; the user chose it. Publishing a listing is never
+automated: that click is always yours.
 
 ## Known limits
 

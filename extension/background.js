@@ -39,6 +39,14 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         const r = await fetch(await appUrl(`/api/photo/${encodeURIComponent(msg.key)}`));
         if (!r.ok) throw new Error(`photo ${r.status}`);
         reply({ ok: true, data: await toDataUrl(await r.blob()) });
+      } else if (msg.type === 'batchInfo') {
+        reply({ ok: true, data: (await chrome.storage.session.get('batch')).batch || null });
+      } else if (msg.type === 'batchResult') {
+        for (const w of waiters.splice(0)) w(msg);
+        reply({ ok: true });
+      } else if (msg.type === 'batch') {
+        runBatch();
+        reply({ ok: true });
       } else if (msg.type === 'pending') {
         // Remember which draft is being filled in which tab, so the publish can be linked.
         await chrome.storage.session.set({ pendingDraft: msg.id, pendingTab: sender.tab?.id ?? null });
@@ -66,15 +74,81 @@ chrome.tabs.onUpdated.addListener(async (tabId, info) => {
   } catch {}
 });
 
-// Once a day, ask the app what is due and nudge.
+// ---------------------------------------------------------------------------
+// Batch drops. One confirmation, then every due listing is opened in a
+// minimized window, its price typed, Salva pressed, and the tab closed — with
+// a random 5–15 s pause between items, because a person does not edit ten
+// prices in ten seconds. This is the user's own browser and session: Vinted
+// sees a person editing their own prices. Chosen by the user, eyes open.
+// ---------------------------------------------------------------------------
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const rnd = (a, b) => a + Math.random() * (b - a);
+const waiters = [];
+const waitResult = (id, ms) => new Promise((res) => {
+  const t = setTimeout(() => res(null), ms);
+  waiters.push((m) => { if (m.id === id) { clearTimeout(t); res(m); } });
+});
+const say = (message) => chrome.notifications.create({ type: 'basic', iconUrl: 'icon.png', title: 'Quicksell', message });
+
+let running = false;
+async function runBatch() {
+  if (running) return;
+  running = true;
+  let win = null;
+  try {
+    const { items } = await api('/api/due');
+    if (!items?.length) return say('Niente da ribassare.');
+    win = await chrome.windows.create({ url: 'about:blank', focused: false, state: 'minimized' });
+    let done = 0; const failed = [];
+    for (const it of items) {
+      await chrome.storage.session.set({ batch: { id: it.id, vintedId: String(it.vinted_id), price: it.due_price } });
+      const tab = await chrome.tabs.create({ windowId: win.id, url: it.vinted_url + '/edit', active: true });
+      // Success is either the content script reporting, or the tab leaving /edit
+      // after Salva (which kills the content script before it can report).
+      const left = new Promise((res) => {
+        const h = (tid, info) => { if (tid === tab.id && info.url && !/\/edit/.test(info.url)) { chrome.tabs.onUpdated.removeListener(h); res({ ok: true }); } };
+        chrome.tabs.onUpdated.addListener(h);
+        setTimeout(() => chrome.tabs.onUpdated.removeListener(h), 90000);
+      });
+      const res = await Promise.race([waitResult(it.id, 90000), left]);
+      if (res?.ok) {
+        await api(`/api/items/${it.id}/dropped`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+        done++;
+        await chrome.tabs.remove(tab.id).catch(() => {});
+      } else {
+        // Leave it open and bring it forward: the human finishes this one.
+        failed.push(it.title);
+        await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
+      }
+      await sleep(rnd(5000, 15000));
+    }
+    await chrome.storage.session.remove('batch');
+    if (failed.length) {
+      await chrome.windows.update(win.id, { state: 'normal', focused: true }).catch(() => {});
+      say(`${done} ribassi fatti. Da finire a mano: ${failed.join(', ')}.`);
+    } else {
+      await chrome.windows.remove(win.id).catch(() => {});
+      say(`${done} ribass${done === 1 ? 'o fatto' : 'i fatti'}.`);
+    }
+  } catch (e) {
+    say('Ribassi interrotti: ' + String(e.message));
+    if (win) chrome.windows.update(win.id, { state: 'normal' }).catch(() => {});
+  } finally {
+    running = false;
+  }
+}
+
+// Once a day: what is due, with a button to do it all.
 chrome.alarms.create('due', { periodInMinutes: 60 * 24 });
 chrome.alarms.onAlarm.addListener(async () => {
   try {
     const { items } = await api('/api/due');
     if (!items?.length) return;
-    chrome.notifications.create({
-      type: 'basic', iconUrl: 'icon.png', title: 'Quicksell',
-      message: items.length === 1 ? `${items[0].title}: scendi a €${items[0].due_price}` : `${items.length} articoli da ribassare`,
+    chrome.notifications.create('due', {
+      type: 'basic', iconUrl: 'icon.png', title: 'Quicksell', requireInteraction: true,
+      message: items.length === 1 ? `${items[0].title}: scendi a ${items[0].due_price} €` : `${items.length} articoli da ribassare`,
+      buttons: [{ title: items.length === 1 ? 'Ribassa' : `Ribassa tutti (${items.length})` }],
     });
   } catch {}
 });
+chrome.notifications.onButtonClicked.addListener((id) => { if (id === 'due') runBatch(); });

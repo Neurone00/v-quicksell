@@ -10,6 +10,18 @@ lower — you lower it.
 automated writes. It reads public pages only. There is nothing for Vinted to
 ban, and nothing to expire.
 
+## Where everything is
+
+| | |
+|---|---|
+| App (phone + computer) | https://v-quicksell.neurone00.workers.dev |
+| Extension, versioned | https://github.com/Neurone00/v-quicksell/releases — latest zip is always there |
+| Code | https://github.com/Neurone00/v-quicksell (this repo; pushes deploy the app) |
+| How the extension works (clickable) | https://claude.ai/artifact/FervEcfhPGmtUiWiLjdp5M |
+| App prototype, mock data | https://claude.ai/artifact/Rx3rN8cy5oGQ6wEF2i6xTs (shows an older flow) |
+
+New extension version: bump `extension/manifest.json`, edit `RELEASE.md`, `npm run release`.
+
 ## The flow
 
 | where | what |

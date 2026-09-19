@@ -137,9 +137,23 @@ const sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // The detail fields are <input type=text> with clean ids (from the live form):
 // #size #condition #color #material #brand #price. Focusing one opens its menu.
+// Vinted options are <div role="checkbox|radio"> (or role=option) carrying an
+// exact aria-label ("L", "Ottime", "Cotone"…). Prefer those; the aria-label is
+// the clean value to match and harvest.
+const optLabel = (o) => (o.getAttribute && o.getAttribute('aria-label')) || o.textContent.trim();
 function optionEls(scope) {
-  return [...scope.querySelectorAll('[role="option"], [data-testid*="option"], li, label, a, button, [class*="cell"], [class*="option"]')]
-    .filter((o) => o.offsetParent !== null && o.textContent.trim() && o.textContent.trim().length < 44);
+  let els = [...scope.querySelectorAll('[role="option"], [role="checkbox"], [role="radio"]')];
+  if (!els.length) els = [...scope.querySelectorAll('li, label, button, [data-testid*="option"], [class*="option"]')];
+  return els.filter((o) => o.offsetParent !== null && optLabel(o) && optLabel(o).length < 60);
+}
+// Click the interactive option element itself with a real pointer sequence —
+// React's web_ui checkbox/radio ignores a bare div click otherwise.
+function selectOption(o) {
+  const t = o.matches('[role="checkbox"], [role="radio"], [role="option"]') ? o
+    : (o.querySelector('[role="checkbox"], [role="radio"], [role="option"], input, label') || o);
+  for (const ev of ['pointerover', 'pointerenter', 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+    t.dispatchEvent(new MouseEvent(ev, { bubbles: true, cancelable: true, view: window }));
+  }
 }
 const menuSel = '[role="listbox"], [role="dialog"], [role="menu"], [class*="dropdown"], [class*="menu"], [class*="popover"], ul';
 // A menu that appeared after we focused the input (not one already open).
@@ -178,31 +192,25 @@ async function pickInput(input, want, mode, harvestKey) {
   if (menu && harvestKey) {                            // full list, before any type-filter
     // keep only short, clean labels — options with a long description (e.g.
     // condizioni) would pollute the enum we send the AI.
-    const all = optionEls(menu).map((o) => o.textContent.trim()).filter((t) => t.length <= 28);
+    const all = optionEls(menu).map((o) => optLabel(o)).filter((t) => t && t.length <= 28);
     if (all.length > (HARVEST[harvestKey]?.length || 0)) HARVEST[harvestKey] = all;
   }
   // brand (and any type-to-filter field): narrow by typing, then re-scan
-  if (mode === 'brand' || (menu && !optionEls(menu).some((o) => matchOpt(norm(o.textContent), want, mode)))) {
+  if (mode === 'brand' || (menu && !optionEls(menu).some((o) => matchOpt(norm(optLabel(o)), want, mode)))) {
     type(input, mode === 'first' ? want.split(' ')[0] : want);
     menu = (await waitMenu(before)) || menu;
   }
   if (!menu) return 'nomenu';
-  const hit = optionEls(menu).find((o) => matchOpt(norm(o.textContent), want, mode));
+  const hit = optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), want, mode));
   if (!hit) { closeMenu(); return 'nomatch'; }
+  const wasChecked = hit.getAttribute && hit.getAttribute('aria-checked');
   selectOption(hit);
-  await sleep2(200); closeMenu();
-  // confirm it registered (the field input now holds a value); else report failure
-  return input.value.trim() ? 'ok' : 'nomatch';
-}
-// Vinted's options are checkbox/radio rows in a React flyout — click the input
-// (or its label) with a real pointer sequence, not the wrapping div.
-function selectOption(o) {
-  const row = o.closest('label, li, [role="option"]') || o;
-  const inp = (o.matches && o.matches('input')) ? o : row.querySelector('input[type="checkbox"], input[type="radio"], input');
-  const target = row.querySelector('label') || inp || o;
-  for (const t of ['pointerover', 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
-    target.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window }));
-  }
+  await sleep2(250);
+  // confirm it registered: the field input got a value, or the option is now checked
+  const ok = input.value.trim() || hit.getAttribute?.('aria-checked') === 'true'
+    || (wasChecked === 'false' && hit.getAttribute?.('aria-checked') !== 'false');
+  closeMenu();
+  return ok ? 'ok' : 'nomatch';
 }
 // Snapshot what a field's menu looks like, so a failure is debuggable without guessing.
 async function probe(input) {
@@ -210,7 +218,7 @@ async function probe(input) {
   input.focus(); input.click();
   await sleep2(400);
   const menus = [...document.querySelectorAll(menuSel)].filter((e) => !before.has(e) && e.offsetParent !== null).slice(0, 2);
-  const snap = menus.map((m) => ({ tag: m.tagName, cls: (m.className || '').toString().slice(0, 60), role: m.getAttribute('role'), opts: optionEls(m).slice(0, 8).map((o) => o.textContent.trim()) }));
+  const snap = menus.map((m) => ({ tag: m.tagName, cls: (m.className || '').toString().slice(0, 60), role: m.getAttribute('role'), opts: optionEls(m).slice(0, 8).map((o) => optLabel(o)) }));
   closeMenu();
   return { readonly: input.readOnly, appeared: snap };
 }

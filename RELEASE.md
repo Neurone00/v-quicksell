@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.12
+
+**1.4.12** — ora seleziona davvero: le opzioni Vinted sono <div role=checkbox/radio> con aria-label esatto (es. “L”). Clicco quell’elemento e verifico che sia spuntato. Vale per taglia, condizioni, colore, materiale.
+
 ## Quicksell 1.4.11
 
 **1.4.11** — le opzioni Vinted sono caselle/radio dentro i menu: ora clicco l’elemento giusto (non la riga), e verifico che il valore sia entrato. Il tasto Diagnostica ora copia anche il DOM dei menu nell’app, così sistemo la selezione con precisione.

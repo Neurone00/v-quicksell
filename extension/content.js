@@ -135,107 +135,93 @@ function fillText(it) {
 const norm = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 const sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// The label cell for a field, climbed to the container that holds its control.
-function fieldRow(labelRe) {
-  const lab = [...document.querySelectorAll('label, legend, h3, h4, span, div')]
-    .find((e) => e.children.length === 0 && labelRe.test(e.textContent.trim()));
-  if (!lab) return null;
-  let row = lab.parentElement;
-  for (let i = 0; i < 6 && row; i++, row = row.parentElement) {
-    if (row.querySelector('select, [role="combobox"], [role="button"], button, input')) return row;
-  }
-  return null;
-}
-// Does the row already show a chosen value (not the "Seleziona…" placeholder)?
-function rowHasValue(row) {
-  const inp = row.querySelector('input');
-  if (inp && inp.value.trim()) return true;
-  // no "Seleziona…/Scegli…" placeholder left means a value is already chosen —
-  // don't overwrite the user's own pick.
-  return !/seleziona|scegli/.test(norm(row.textContent));
-}
-function triggerOf(row) {
-  const ph = [...row.querySelectorAll('*')].find((e) => e.children.length === 0 && /^(seleziona|scegli)\b/i.test(e.textContent.trim()));
-  return ph?.closest('button, [role="button"], [role="combobox"], div[tabindex], a')
-    || row.querySelector('[role="combobox"], [role="button"], button')
-    || ph?.parentElement || row;
-}
+// The detail fields are <input type=text> with clean ids (from the live form):
+// #size #condition #color #material #brand #price. Focusing one opens its menu.
 function optionEls(scope) {
-  return [...scope.querySelectorAll('[role="option"], [data-testid*="option"], li, label, button')]
+  return [...scope.querySelectorAll('[role="option"], [data-testid*="option"], li, label, a, button, [class*="cell"], [class*="option"]')]
     .filter((o) => o.offsetParent !== null && o.textContent.trim() && o.textContent.trim().length < 44);
 }
-// Wait for a menu/list that appeared after the click (not one already open).
+const menuSel = '[role="listbox"], [role="dialog"], [role="menu"], [class*="dropdown"], [class*="menu"], [class*="popover"], ul';
+// A menu that appeared after we focused the input (not one already open).
 async function waitMenu(before) {
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 16; i++) {
     await sleep2(90);
-    const cands = [...document.querySelectorAll('[role="listbox"], [role="dialog"], [role="menu"], ul')]
+    const cands = [...document.querySelectorAll(menuSel)]
       .filter((e) => !before.has(e) && e.offsetParent !== null && e.getBoundingClientRect().height > 20 && optionEls(e).length >= 1);
-    if (cands.length) return cands[cands.length - 1];
+    if (cands.length) return cands[cands.length - 1];   // topmost/portal
   }
   return null;
 }
-const closeMenu = () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); };
+const closeMenu = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 function matchOpt(text, want, mode) {
   const w = norm(want);
   if (mode === 'token') return text.split(/[^a-z0-9]+/).includes(w);           // "L" ≠ "XL"
   if (mode === 'first') return text.split(' ').includes(w.split(' ')[0]) || text.includes(w.split(' ')[0]);
+  if (mode === 'brand') return text.includes(w);
   return text === w || text.startsWith(w) || w.startsWith(text) || text.includes(w); // phrase
 }
-async function pickField(row, want, mode) {
-  if (rowHasValue(row)) return true;
-  const sel = row.querySelector('select');
-  if (sel) {
-    const opt = [...sel.options].find((o) => matchOpt(norm(o.textContent), want, mode));
-    if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; }
-    return false;
+// Open the input's menu and click the option matching `want`. Returns
+// 'ok' | 'nomatch' (menu opened, no option fit) | 'nomenu' (couldn't open).
+async function pickInput(input, want, mode) {
+  if (input.value.trim()) return 'ok';                 // already chosen — don't touch
+  const before = new Set(document.querySelectorAll(menuSel));
+  input.focus(); input.click();
+  let menu = await waitMenu(before);
+  // brand (and any type-to-filter field): narrow by typing, then re-scan
+  if (mode === 'brand' || (menu && !optionEls(menu).some((o) => matchOpt(norm(o.textContent), want, mode)))) {
+    type(input, mode === 'first' ? want.split(' ')[0] : want);
+    menu = (await waitMenu(before)) || menu;
   }
-  const before = new Set(document.querySelectorAll('[role="listbox"], [role="dialog"], [role="menu"], ul'));
-  triggerOf(row).click();
-  const menu = await waitMenu(before);
-  if (!menu) return false;                       // couldn't open — leave it, never guess
+  if (!menu) return 'nomenu';
   const hit = optionEls(menu).find((o) => matchOpt(norm(o.textContent), want, mode));
-  if (!hit) { closeMenu(); return false; }
-  hit.click();
-  await sleep2(150);
-  closeMenu();
-  return true;
-}
-async function pickBrand(row, brand) {
-  if (rowHasValue(row)) return true;
-  const inp = row.querySelector('input');
-  if (!inp) return false;
-  const before = new Set(document.querySelectorAll('[role="listbox"], [role="dialog"], [role="menu"], ul'));
-  type(inp, brand);
-  const menu = await waitMenu(before);
-  if (!menu) return false;
-  const hit = optionEls(menu).find((o) => norm(o.textContent).includes(norm(brand)));  // only an exact-ish brand, never a random first row
-  if (!hit) { closeMenu(); return false; }
+  if (!hit) { closeMenu(); return 'nomatch'; }
   hit.click(); await sleep2(150); closeMenu();
-  return true;
+  return 'ok';
+}
+// Snapshot what a field's menu looks like, so a failure is debuggable without guessing.
+async function probe(input) {
+  const before = new Set(document.querySelectorAll(menuSel));
+  input.focus(); input.click();
+  await sleep2(400);
+  const menus = [...document.querySelectorAll(menuSel)].filter((e) => !before.has(e) && e.offsetParent !== null).slice(0, 2);
+  const snap = menus.map((m) => ({ tag: m.tagName, cls: (m.className || '').toString().slice(0, 60), role: m.getAttribute('role'), opts: optionEls(m).slice(0, 8).map((o) => o.textContent.trim()) }));
+  closeMenu();
+  return { readonly: input.readOnly, appeared: snap };
 }
 
 let autoStop = 0;
 function autoFill(it) {
   autoStop = Date.now() + 180000;
   const jobs = [
-    { key: 'Prezzo', price: true, val: it.list_price },
-    { key: 'Taglia', label: /^Taglia$/i, val: it.size, mode: 'token' },
-    { key: 'Condizioni', label: /^Condizioni$/i, val: it.condition, mode: 'phrase' },
-    { key: 'Colore', label: /^Color[ie]$/i, val: it.color, mode: 'first' },
-    { key: 'Materiale', label: /Materiale/i, val: it.material, mode: 'first' },
-    { key: 'Marca', label: /^Marca$/i, val: it.brand, brand: true },
+    { key: 'Prezzo', id: 'price', price: true, val: it.list_price },
+    { key: 'Taglia', id: 'size', val: it.size, mode: 'token' },
+    { key: 'Condizioni', id: 'condition', val: it.condition, mode: 'phrase' },
+    { key: 'Colore', id: 'color', val: it.color, mode: 'first' },
+    { key: 'Materiale', id: 'material', val: it.material, mode: 'first' },
+    { key: 'Marca', id: 'brand', val: it.brand, mode: 'brand' },
   ].map((j) => ({ ...j, done: !j.val }));   // nothing to set → already "done"
   let running = false;
-  const finish = () => { obs.disconnect(); clearInterval(iv); const left = jobs.filter((j) => !j.done && j.val).map((j) => j.key); setAutoStatus(left); };
+  const finish = async () => {
+    obs.disconnect(); clearInterval(iv);
+    const left = jobs.filter((j) => !j.done && j.val);
+    setAutoStatus(left.map((j) => j.key));
+    // report the menu DOM of whatever we couldn't fill, so it can be fixed precisely
+    if (left.length) {
+      const fields = {};
+      for (const j of left) { const el = document.getElementById(j.id); if (el) fields[j.key] = await probe(el); }
+      send({ type: 'api', path: '/api/learn', method: 'POST', body: { url: location.pathname, dropdownProbe: fields } });
+    }
+  };
   const tick = async () => {
     if (running) return; running = true;
     try {
       for (const j of jobs) {
         if (j.done) continue;
-        if (j.price) { const p = findPrice(); if (p && !p.value) { type(p, String(j.val)); j.done = true; } continue; }
-        const row = fieldRow(j.label);
-        if (!row) continue;                    // not rendered yet
-        j.done = j.brand ? await pickBrand(row, j.val) : await pickField(row, j.val, j.mode);
+        const el = document.getElementById(j.id);
+        if (!el) continue;                     // field not rendered yet (before category)
+        if (j.price) { if (!el.value) type(el, String(j.val)); j.done = true; continue; }
+        const r = await pickInput(el, j.val, j.mode);
+        if (r === 'ok') j.done = true;         // retry on 'nomenu'/'nomatch' next tick
       }
     } finally { running = false; }
     if (jobs.every((j) => j.done) || Date.now() > autoStop) finish();

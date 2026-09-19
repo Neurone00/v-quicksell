@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.8
+
+**1.4.8** — i menu (taglia, condizioni, colore, materiale, marca) sono campi con id noti: ora li apro col metodo giusto e scelgo l'opzione. Se qualcosa non va, mando all'app com’è fatto il menu, così lo sistemo al volo.
+
 ## Quicksell 1.4.7
 
 **1.4.7** — compila da solo anche taglia, condizioni, colore, materiale e marca: apre i menu di Vinted e sceglie l'opzione giusta appena compaiono (dopo la categoria). Se un valore non combacia, lo lascia a te e te lo dice nel pannello.

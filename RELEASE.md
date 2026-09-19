@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.1
+
+**1.4.1** — pins the extension ID (`ceffnhbkhebjpmdfdfinpmegnclgbknf`) so a hand-loaded copy and the auto-updating one are the same extension. If you loaded 1.3.0 unpacked, remove it and use the policy install below.
+
 ## Quicksell 1.4.0
 
 **New in 1.4.0**

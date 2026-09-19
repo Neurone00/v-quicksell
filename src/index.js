@@ -147,23 +147,32 @@ async function route(p, req, env, ctx) {
 
   if (p === '/api/reach') return json(await V.reachability(env));
 
-  // One-off recon: what does the real new-listing flow expose?
-  if (p === '/api/uploadcfg') {
-    const paths = ['/api/v2/catalogs', '/api/v2/item_upload/configuration',
-      '/api/v2/item_upload/items/new', '/api/v2/colours', '/api/v2/statuses',
-      '/api/v2/sizes', '/api/v2/size_groups'];
-    const out = [];
-    for (const path of paths) {
-      try {
-        const r = await V.vapi(env, path);
-        out.push({ path, ok: true, keys: Array.isArray(r) ? `array(${r.length})` : Object.keys(r).slice(0, 8) });
-      } catch (e) { out.push({ path, error: String(e.message).slice(0, 110) }); }
+  // Generic authenticated GET, for working out undocumented shapes.
+  if (p === '/api/get') {
+    const target = url.searchParams.get('path');
+    if (!target) return json({ error: 'path richiesto' }, 400);
+    try {
+      const r = await V.vapi(env, target);
+      return json({ ok: true, body: r });
+    } catch (e) {
+      return json({ ok: false, error: String(e.message).slice(0, 300) }, 200);
     }
-    return json(out);
   }
 
-  // Which endpoint refreshes the 2h access token?
-  if (p === '/api/refreshtest') return json(await V.findRefresh(env));
+  // Deliberately empty item: cannot create anything, but Vinted answers with
+  // the list of fields it requires. Safer than guessing a payload and
+  // accidentally publishing something.
+  if (p === '/api/validate' && req.method === 'POST') {
+    if (url.searchParams.get('browser')) {
+      return json(await V.apiInBrowser(env, '/api/v2/items', { method: 'POST', json: { item: {} } }));
+    }
+    try {
+      const r = await V.vapi(env, '/api/v2/items', { method: 'POST', json: { item: {} } });
+      return json({ unexpected_success: r });
+    } catch (e) {
+      return json({ status: e.status, body: e.body });
+    }
+  }
 
   if (p === '/api/probe') return json(await V.probe(env, url.searchParams.get('q'), url.searchParams.get('photo')));
 

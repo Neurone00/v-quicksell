@@ -207,6 +207,38 @@ export async function browserAct(env, sessionId, act) {
   }
 }
 
+// Writes from plain fetch get a Datadome captcha; the same request from inside
+// a real browser page does not. This runs one API call in a browser session so
+// we can tell the two apart before committing the architecture either way.
+export async function apiInBrowser(env, path, init = {}) {
+  const cookies = JSON.parse((await env.KV.get(SESSION_KEY)) || 'null');
+  if (!cookies) throw new Error('NO_SESSION');
+  const browser = await puppeteer.launch(env.BROWSER, { keep_alive: 60000 });
+  try {
+    const page = await browser.newPage();
+    await page.setCookie(...cookies);
+    await page.goto(`https://${env.VINTED_HOST}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    return await page.evaluate(async (path, init) => {
+      const token = /CSRF_TOKEN[\\"\s:]+([0-9a-f-]{36})/.exec(document.documentElement.innerHTML || '');
+      const r = await fetch(path, {
+        method: init.method || 'GET',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json, text/plain, */*',
+          ...(token ? { 'x-csrf-token': token[1] } : {}),
+          ...(init.json ? { 'content-type': 'application/json' } : {}),
+        },
+        body: init.json ? JSON.stringify(init.json) : undefined,
+      });
+      const text = await r.text();
+      let body; try { body = JSON.parse(text); } catch { body = text.slice(0, 300); }
+      return { status: r.status, body, csrf: Boolean(token) };
+    }, path, init);
+  } finally {
+    await browser.close();
+  }
+}
+
 export async function browserStop(env, sessionId) {
   const browser = await puppeteer.connect(env.BROWSER, sessionId).catch(() => null);
   if (browser) await browser.close().catch(() => {});

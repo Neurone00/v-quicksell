@@ -1,7 +1,7 @@
 import * as V from './vinted.js';
 import { analysePhotos, priceFromComparables } from './ai.js';
 import { notify } from './push.js';
-import { listPrice, nextPrice } from './price.js';
+import { listPrice, nextPrice, round9 } from './price.js';
 
 // ponytail: photos live in KV, not R2. R2 needs a card on file just to enable;
 // KV is already bound, free, and 1GB holds far more than this app will store.
@@ -269,7 +269,7 @@ async function analyse(env, id) {
 
     const price = await priceFromComparables(env, a, [...comparables, ...ownSold]);
     const list = listPrice(price.est_price, Number(env.BUMP_PCT));
-    const floor = Math.max(3, Math.round(price.floor_price * 2) / 2);
+    const floor = round9(price.floor_price);
 
     await db.prepare(
       `UPDATE items SET status=?, title=?, description=?, brand=?, brand_source=?, size=?, size_source=?,
@@ -299,6 +299,8 @@ async function approve(env, item, edits) {
     return { error: 'Conferma la marca o lascia il campo vuoto.' };
   }
   if (!merged.size) return { error: 'Manca la taglia.' };
+  merged.list_price = round9(Number(merged.list_price) || item.list_price);
+  merged.floor_price = Math.min(round9(Number(merged.floor_price) || item.floor_price), merged.list_price);
   await env.DB.prepare(
     `UPDATE items SET status='ready', title=?, description=?, brand=?, size=?, list_price=?, floor_price=?, current_price=? WHERE id=?`
   ).bind(merged.title, merged.description, merged.brand || null, merged.size, merged.list_price, merged.floor_price, merged.list_price, item.id).run();

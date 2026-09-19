@@ -82,7 +82,7 @@ function fillText(it) {
   const t = find(FIELDS.title), d = find(FIELDS.description), p = find(FIELDS.price);
   if (t) type(t, it.title);
   if (d) type(d, it.description);
-  if (p) type(p, String(it.list_price));
+  if (p) type(p, String(it.list_price).replace('.', ','));
   return [['Titolo', t], ['Descrizione', d], ['Prezzo', p]].filter(([, el]) => !el).map(([n]) => n);
 }
 
@@ -172,7 +172,7 @@ async function onLocalPhotos(files) {
     const due = r?.ok && (r.data.items || []).find((x) => String(x.vinted_id) === id);
     if (due) {
       const p = find(FIELDS.price);
-      if (p) type(p, String(due.due_price));
+      if (p) type(p, String(due.due_price).replace('.', ','));
       show(`${head('ribasso')}Prezzo impostato a <b>${due.due_price} €</b> (era ${due.current_price} €, minimo ${due.floor_price} €).<br><small>Salva su Vinted e segno il ribasso come fatto.</small>`);
       document.addEventListener('submit', () => send({ type: 'api', path: `/api/items/${due.id}/dropped`, method: 'POST', body: {} }), true);
     }

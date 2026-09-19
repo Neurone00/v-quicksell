@@ -22,7 +22,7 @@ ban, and nothing to expire.
 | app | sees the new listing and tracks it: views, favourites, sold |
 | every 3 days | a notification: "*Vestito Zara*: scendi a 8,55 €" → one click opens the listing, the extension sets the price, you save |
 
-Listed at fair value **+50%**, dropped **−5% every 3 days**, never below the floor.
+Listed at fair value **+50%**, dropped **−5% every 3 days**, never below the floor. Every price ends in **,X9** (8,59 not 8,55; 8,99 not 9).
 
 No computer nearby? Every approved draft has **Copia titolo / descrizione /
 prezzo**. Paste into Vinted's app, publish, share the listing back to Quicksell.

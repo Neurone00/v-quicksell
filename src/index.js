@@ -117,6 +117,26 @@ export default {
 
     if (p === '/api/version') return json({ version: env.APP_VERSION });
 
+    // Self-serve account: the extension calls this to mint an account key.
+    // No auth required (a new person has no key). If the caller IS the owner
+    // (their browser still holds the owner key), the owner's existing drafts
+    // move to the new account — the one-time "this is now my account" step.
+    if (p === '/api/enroll' && req.method === 'POST') {
+      const caller = await userOf(req, env);
+      const users = JSON.parse((await env.KV.get('users')) || '{}');
+      if (Object.keys(users).length > 200) return json({ error: 'troppi account' }, 429);
+      const key = [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, '0')).join('');
+      const name = 'u' + Date.now().toString(36) + Math.floor(Math.random() * 1e3).toString(36);
+      users[key] = name;
+      await env.KV.put('users', JSON.stringify(users));
+      if (caller === 'owner') {
+        await env.DB.prepare("UPDATE items SET user_id=? WHERE user_id='owner'").bind(name).run();
+        const sub = (await env.KV.get('push_sub:owner')) || (await env.KV.get('push_sub'));
+        if (sub) await env.KV.put(`push_sub:${name}`, sub);
+      }
+      return json({ key, user: name, url: `${env.PUBLIC_URL}/?k=${key}`, claimed: caller === 'owner' });
+    }
+
     const user = await userOf(req, env);
     if (!user) return json({ error: 'unauthorized' }, 401);
 

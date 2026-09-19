@@ -1,3 +1,4 @@
+const DEFAULT_APP_URL = 'https://v-quicksell.neurone00.workers.dev';
 const $ = (s) => document.querySelector(s);
 const send = (msg) => new Promise((res) => chrome.runtime.sendMessage(msg, res));
 

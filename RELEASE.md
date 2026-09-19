@@ -1,5 +1,12 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.0
+
+**New in 1.4.0**
+- **Accounts, self-serve.** The extension's popup has **Crea account** — one click, no email, no password. The account lives in the extension and on the phone you connect to it.
+- **Connect your phone** with a QR (or a copied link): the phone joins the same account.
+- Creating your account from a Chrome that's signed into the owner login moves the existing drafts to it.
+
 ## Quicksell 1.3.1
 
 **1.3.1** — fixes the extension not seeing the app's login (SameSite cookie); it now reads it through Chrome's cookie API.

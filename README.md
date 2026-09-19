@@ -93,12 +93,14 @@ top of `extension/content.js` is where to fix it.
 Every draft, notification and price drop belongs to one user, so a test account's
 listings never land in the real account's batch. Two ways to be a user:
 
-**A key** — works now, no setup.
-```bash
-npm run user -- add test
-```
-prints a login link. Open it once on that device; put the same key in the
-extension's popup. Your original `APP_SECRET` is the owner.
+**Self-serve (the normal way)** — install the extension, open its popup, click
+**Crea account**. No email, no password: the account lives in the extension.
+Then **Collega il telefono** shows a QR — scan it and the phone joins the same
+account. If you create the account from a Chrome signed into the owner login,
+the existing drafts move to it.
+
+**By link (for handing someone an account)** — `npm run user -- add <name>`
+prints a login link to send them; `APP_SECRET` is the owner key.
 
 **Google sign-in** — no Firebase, no code: Cloudflare Access. Zero Trust
 dashboard → Access → Applications → Self-hosted → the app's hostname → identity

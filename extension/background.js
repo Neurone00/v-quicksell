@@ -58,6 +58,13 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       } else if (msg.type === 'batch') {
         runBatch();
         reply({ ok: true });
+      } else if (msg.type === 'enroll') {
+        // One click creates the account. If this Chrome holds the owner login,
+        // appUrl() sends it and the server moves the owner's drafts across.
+        const r = await fetch(await appUrl('/api/enroll'), { method: 'POST' });
+        const d = await r.json();
+        if (d.key) await chrome.storage.sync.set({ secret: d.key });
+        reply({ ok: r.ok, data: d });
       } else if (msg.type === 'pending') {
         // Remember which draft is being filled in which tab, so the publish can be linked.
         await chrome.storage.session.set({ pendingDraft: msg.id, pendingTab: sender.tab?.id ?? null });

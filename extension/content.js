@@ -126,8 +126,8 @@ function fillText(it) {
   const t = find(FIELDS.title), d = find(FIELDS.description), p = findPrice();
   if (t) type(t, it.title);
   if (d) type(d, it.description);
-  if (p) type(p, String(it.list_price).replace('.', ','));
-  else watchPrice(String(it.list_price).replace('.', ','));  // appears after you pick the category
+  if (p) type(p, String(it.list_price));
+  else watchPrice(String(it.list_price));  // appears after you pick the category
   // Title/description are the required ones; price is expected to be missing
   // on a fresh form, so don't report it as a failure.
   return [['Titolo', t], ['Descrizione', d]].filter(([, el]) => !el).map(([n]) => n);
@@ -254,7 +254,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
 
   if (/\/items\/\d+\/edit/.test(location.pathname)) {
     const id = location.pathname.match(/\/items\/(\d+)/)[1];
-    const fmt = (n) => String(n).replace('.', ',');
+    const fmt = (n) => String(n);  // dot decimal: Vinted parses with Number()
 
     // In a batch? The background holds which listing it opened and at what price.
     const b = await send({ type: 'batchInfo' });

@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.6
+
+**1.4.6** — il prezzo ora si scrive giusto (prima usciva “NaN €”: Vinted legge il numero col punto, non la virgola).
+
 ## Quicksell 1.4.5
 
 **1.4.5** — the popup now shows your account key with a Copia button, so you can back it up. Auto-updates keep it; only removing the extension clears it.

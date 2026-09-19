@@ -1,0 +1,44 @@
+/* Quicksell design tokens. The single source for every colour, face, radius
+   and easing in the app, the extension and the docs. Sampled from vinted.it
+   (Calypso darkened per the 2022 Kiln rebrand) so the product feels native to
+   the place it lives — then made its own with the mark, Fraunces and the line. */
+:root {
+  /* brand */
+  --qs-calypso: #007782;   /* primary: actions, wordmark, the line */
+  --qs-mint:    #32AE88;   /* success, "online", "sold" */
+  --qs-mint-soft: #D6EFE6;
+
+  /* neutrals — cool, from the page colour Vinted itself uses */
+  --qs-page:    #EDF2F2;
+  --qs-surface: #FFFFFF;
+  --qs-ink:     #15191A;
+  --qs-muted:   #5A6566;
+  --qs-line:    rgba(21, 25, 26, .12);
+
+  /* semantic — separate from the accent on purpose */
+  --qs-warn:      #B4690E;
+  --qs-warn-soft: #FBF0DD;
+  --qs-bad:       #D4351C;
+
+  /* type */
+  --qs-display: "Fraunces", Georgia, serif;   /* wordmark, empty-state titles; SOFT 60 */
+  --qs-ui:      "Inter", -apple-system, system-ui, sans-serif;
+  --qs-mono:    ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* scale (px): 11 label · 13 secondary · 15 body · 17 card title · 19 price · 25 wordmark · 30+ display */
+
+  /* shape */
+  --qs-r-sm: 8px;   --qs-r-md: 12px;   --qs-r-lg: 16px;   --qs-r-xl: 20px;   --qs-r-pill: 99px;
+
+  /* motion — one overshoot curve; draw-once then gesture for illustrations */
+  --qs-overshoot: cubic-bezier(.34, 1.42, .64, 1);
+  --qs-fast: .18s;  --qs-base: .4s;  --qs-draw: 1.15s;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --qs-calypso: #2FC4CE; --qs-mint: #4FD6A8; --qs-mint-soft: #11302A;
+    --qs-page: #0E1212; --qs-surface: #171D1E; --qs-ink: #F2F5F5; --qs-muted: #9BA7A8;
+    --qs-line: rgba(242, 245, 245, .14);
+    --qs-warn: #E8A33D; --qs-warn-soft: #2A2213; --qs-bad: #F2796B;
+  }
+}

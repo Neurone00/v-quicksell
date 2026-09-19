@@ -29,6 +29,11 @@ function type(el, value) {
 let panel;
 function show(html) {
   if (!panel) {
+    if (!document.getElementById('qs-fonts')) {
+      const l = document.createElement('link'); l.id = 'qs-fonts'; l.rel = 'stylesheet';
+      l.href = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,600,60&family=Inter:wght@400;500;600&display=swap';
+      document.head.appendChild(l);
+    }
     panel = document.createElement('div');
     panel.id = 'qs-panel';
     panel.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99999;width:330px;max-height:72vh;overflow:auto;background:#fff;color:#15191A;border-radius:16px;box-shadow:0 12px 40px -12px rgba(0,0,0,.4);font:14px/1.5 Inter,system-ui,sans-serif;padding:16px;border:1.5px solid #007782';
@@ -37,7 +42,8 @@ function show(html) {
   panel.innerHTML = html;
   return panel;
 }
-const head = (t) => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="color:#007782">Quicksell</b><span style="color:#5A6566;font-size:12px">${t}</span></div>`;
+const MARK = `<svg viewBox="0 0 64 64" width="20" height="20" fill="none" stroke="#007782" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></svg>`;
+const head = (t) => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">${MARK}<b style="color:#007782;font:600 16px Fraunces,Georgia,serif;font-variation-settings:'SOFT' 60">Quicksell</b><span style="color:#5A6566;font-size:12px">${t}</span></div>`;
 
 function learn() {
   const controls = [...document.querySelectorAll('input,textarea,select,button,[role="combobox"],[role="button"]')]

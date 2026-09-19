@@ -1,0 +1,27 @@
+# Cuts a GitHub Release with the extension zip whenever the version in
+# extension/manifest.json changes on main. No manual step: bump, push, done.
+name: Release extension
+on:
+  push:
+    branches: [main]
+    paths: ['extension/**', 'RELEASE.md']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: echo "ver=$(node -p "require('./extension/manifest.json').version")" >> "$GITHUB_OUTPUT"
+      - id: t
+        run: |
+          if git ls-remote --tags origin "refs/tags/v${{ steps.v.outputs.ver }}" | grep -q .; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.t.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VER: ${{ steps.v.outputs.ver }}
+        run: |
+          (cd extension && zip -qr "../quicksell-extension-$VER.zip" . -x '.DS_Store')
+          gh release create "v$VER" "quicksell-extension-$VER.zip" --title "Quicksell $VER" --notes-file RELEASE.md

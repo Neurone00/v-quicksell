@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,600,60&family=Inter:wght@500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#fff}canvas{display:block}</style>
+<canvas id="c" width="2400" height="800"></canvas>
+<script>
+// Renders the banner to a canvas so the pixels can be read back as a PNG.
+(async () => {
+  await document.fonts.load("600 160px Fraunces"); await document.fonts.load("500 44px Inter"); await document.fonts.ready;
+  const c = document.getElementById('c'), x = c.getContext('2d');
+  x.fillStyle = '#EDF2F2'; x.fillRect(0, 0, 2400, 800);
+  // the line: a soft calypso→mint rail, the brand's one decorative element
+  const g = x.createLinearGradient(0, 120, 0, 680); g.addColorStop(0, '#007782'); g.addColorStop(.6, '#32AE88'); g.addColorStop(1, 'rgba(50,174,136,0)');
+  x.fillStyle = g; x.fillRect(180, 120, 6, 560);
+  // mark
+  x.save(); x.translate(300, 230); x.scale(5.3, 5.3);
+  x.strokeStyle = '#007782'; x.lineWidth = 6.5; x.lineCap = 'round'; x.lineJoin = 'round';
+  x.beginPath(); x.arc(29, 31, 16.5, 0, Math.PI * 2); x.stroke();
+  x.beginPath(); x.moveTo(40.5, 43); x.lineTo(47.5, 50); x.bezierCurveTo(51.5, 54, 57.5, 52.5, 57.5, 47.5); x.bezierCurveTo(57.5, 44, 54.5, 42.5, 52.5, 44); x.stroke();
+  x.restore();
+  // wordmark + line
+  x.fillStyle = '#007782'; x.font = "600 168px Fraunces"; x.fontVariationSettings = "'SOFT' 60"; x.fillText('Quicksell', 700, 420);
+  x.fillStyle = '#5A6566'; x.font = "500 44px Inter"; x.fillText('Fotografa. Approva. Il resto è fatto.', 706, 520);
+  window.__png = c.toDataURL('image/png');
+  document.title = 'ready';
+})();
+</script>

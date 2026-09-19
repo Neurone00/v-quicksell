@@ -1,4 +1,13 @@
-## Quicksell 1.0.0
+<p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
+
+## Quicksell 1.1.0
+
+**New in 1.1.0**
+- Price drops run by themselves: daily and on Chrome startup, in a minimized window, one listing every 5–15 s, then a count. No confirmation.
+- The extension checks for new releases daily and offers the update with one click (badge on the icon).
+- Releases are cut automatically when the version changes.
+- New mark and icons; the extension's pages use the brand faces.
+
 
 **App:** https://v-quicksell.neurone00.workers.dev — open once per device with `?k=<APP_SECRET>`; on Android, Add to home screen.
 

@@ -70,7 +70,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, info) => {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: info.url.split('?')[0] }),
     });
     await chrome.storage.session.remove(['pendingDraft', 'pendingTab']);
-    chrome.notifications.create({ type: 'basic', iconUrl: 'icon.png', title: 'Quicksell', message: 'Annuncio collegato: da ora ne seguo il prezzo.' });
+    chrome.notifications.create({ type: 'basic', iconUrl: 'icons/128.png', title: 'Quicksell', message: 'Annuncio collegato: da ora ne seguo il prezzo.' });
   } catch {}
 });
 
@@ -88,7 +88,7 @@ const waitResult = (id, ms) => new Promise((res) => {
   const t = setTimeout(() => res(null), ms);
   waiters.push((m) => { if (m.id === id) { clearTimeout(t); res(m); } });
 });
-const say = (message) => chrome.notifications.create({ type: 'basic', iconUrl: 'icon.png', title: 'Quicksell', message });
+const say = (message) => chrome.notifications.create({ type: 'basic', iconUrl: 'icons/128.png', title: 'Quicksell', message });
 
 let running = false;
 async function runBatch({ quiet = false } = {}) {
@@ -138,9 +138,39 @@ async function runBatch({ quiet = false } = {}) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Updates. A sideloaded extension cannot update itself — Chrome only honours
+// update_url for Web Store installs — so this does the next best thing: check
+// the latest GitHub Release daily and put the new version one click away.
+// ---------------------------------------------------------------------------
+const REPO = 'Neurone00/v-quicksell';
+const cmpVer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
+
+async function checkUpdate() {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { accept: 'application/vnd.github+json' } });
+    if (!r.ok) return;
+    const rel = await r.json();
+    const latest = String(rel.tag_name || '').replace(/^v/, '');
+    const mine = chrome.runtime.getManifest().version;
+    if (latest && cmpVer(latest, mine) > 0) {
+      const asset = (rel.assets || []).find((a) => /\.zip$/.test(a.name));
+      await chrome.storage.local.set({ update: { version: latest, zip: asset?.browser_download_url || rel.html_url, page: rel.html_url } });
+      chrome.action.setBadgeText({ text: '1' });
+      chrome.action.setBadgeBackgroundColor({ color: '#B4690E' });
+    } else {
+      await chrome.storage.local.remove('update');
+      chrome.action.setBadgeText({ text: '' });
+    }
+  } catch {}
+}
+chrome.alarms.create('update', { periodInMinutes: 60 * 24 });
+chrome.runtime.onInstalled.addListener(checkUpdate);
+
 // Once a day, and whenever Chrome starts (a day missed while it was closed gets
 // done then): if anything is due, just do it. The user asked not to be asked.
 // runBatch says nothing unless there is something to report at the end.
 chrome.alarms.create('due', { periodInMinutes: 60 * 24 });
-chrome.alarms.onAlarm.addListener(() => runBatch({ quiet: true }));
-chrome.runtime.onStartup.addListener(() => runBatch({ quiet: true }));
+chrome.alarms.onAlarm.addListener((a) => { if (a.name === 'due') runBatch({ quiet: true }); if (a.name === 'update') checkUpdate(); });
+chrome.runtime.onStartup.addListener(() => { runBatch({ quiet: true }); checkUpdate(); });

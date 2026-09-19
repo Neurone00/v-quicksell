@@ -15,7 +15,7 @@ fi
 if [ -n "$(git status --porcelain)" ]; then echo "refusing: uncommitted changes — commit first so the tag is real" >&2; exit 1; fi
 
 rm -f "$OUT"
-(cd extension && zip -q -r "../$OUT" manifest.json background.js content.js popup.html popup.js icon.png)
+(cd extension && zip -qr "../$OUT" . -x '.DS_Store')
 gh release create "$TAG" "$OUT" --title "Quicksell $VER" --notes-file RELEASE.md
 rm -f "$OUT"
 gh release view "$TAG" --json url --jq .url

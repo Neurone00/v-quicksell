@@ -1,14 +1,24 @@
 <!doctype html><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,600,60&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-body{width:320px;margin:0;padding:14px;font:14px/1.5 Inter,system-ui,sans-serif;color:#15191A;background:#EDF2F2}
-h1{font:600 18px Georgia,serif;color:#007782;margin:0 0 10px}
-input{width:100%;box-sizing:border-box;padding:9px 11px;border:1.5px solid #D8DCDC;border-radius:10px;margin:4px 0 8px;font:inherit}
-button{background:#007782;color:#fff;border:0;border-radius:99px;padding:9px 14px;font:600 13px Inter,system-ui;cursor:pointer}
-.card{background:#fff;border-radius:12px;padding:10px 12px;margin:8px 0;font-size:13px}
-.card a{color:#007782;font-weight:600;text-decoration:none}
-small{color:#5A6566}
+:root{--calypso:#007782;--mint:#32AE88;--page:#EDF2F2;--surface:#fff;--ink:#15191A;--muted:#5A6566;--line:rgba(21,25,26,.12);--warn:#B4690E;--warn-soft:#FBF0DD}
+@media(prefers-color-scheme:dark){:root{--calypso:#2FC4CE;--mint:#4FD6A8;--page:#0E1212;--surface:#171D1E;--ink:#F2F5F5;--muted:#9BA7A8;--line:rgba(242,245,245,.14);--warn:#E8A33D;--warn-soft:#2A2213}}
+body{width:330px;margin:0;padding:14px;font:14px/1.5 Inter,system-ui,sans-serif;color:var(--ink);background:var(--page)}
+h1{display:flex;align-items:center;gap:8px;font:600 20px/1 Fraunces,Georgia,serif;font-variation-settings:'SOFT' 60;color:var(--calypso);margin:0 0 12px;letter-spacing:-.01em}
+h1 svg{width:24px;height:24px;flex:none}
+h2{font:600 11px/1 Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
+label{display:block;font:600 11px/1 Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:8px 0 5px}
+input{width:100%;box-sizing:border-box;padding:9px 11px;border:1.5px solid transparent;background:var(--surface);color:var(--ink);border-radius:12px;font:inherit}
+input:focus{outline:0;border-color:var(--calypso)}
+button{background:var(--calypso);color:#fff;border:0;border-radius:99px;padding:10px 14px;font:600 13px Inter,system-ui;cursor:pointer;margin-top:8px}
+@media(prefers-color-scheme:dark){button{color:#04211f}}
+.card{background:var(--surface);border-radius:12px;padding:10px 12px;margin:8px 0;font-size:13px}
+.card a{color:var(--calypso);font-weight:600;text-decoration:none}
+.upd{background:var(--warn-soft);color:var(--warn)}.upd a{color:var(--warn)}
+small{color:var(--muted)}
 </style>
-<h1>Quicksell</h1>
+<h1><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></svg>Quicksell</h1>
+<div id="upd"></div>
 <div id="setup">
   <label>Indirizzo dell'app</label><input id="appUrl" placeholder="https://v-quicksell….workers.dev">
   <label>Chiave</label><input id="secret" type="password" placeholder="la chiave dopo ?k=">

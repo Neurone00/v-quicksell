@@ -1,4 +1,6 @@
-# V Quicksell
+<p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="800"></p>
+
+# Quicksell
 
 Photograph a garment on your phone. The app writes the Italian listing, prices it
 against what's actually on Vinted, and asks you once. On your computer, a Chrome
@@ -18,9 +20,9 @@ ban, and nothing to expire.
 | Extension, versioned | https://github.com/Neurone00/v-quicksell/releases — latest zip is always there |
 | Code | https://github.com/Neurone00/v-quicksell (this repo; pushes deploy the app) |
 | How the extension works (clickable) | https://claude.ai/artifact/FervEcfhPGmtUiWiLjdp5M |
-| App prototype, mock data | https://claude.ai/artifact/Rx3rN8cy5oGQ6wEF2i6xTs (shows an older flow) |
+| Brand & design system | https://claude.ai/artifact/JG9FVAdCfoAnH8axsdSE6u · source: [brand/BRAND.md](brand/BRAND.md), [brand/tokens.css](brand/tokens.css), [brand/mark.svg](brand/mark.svg) |
 
-New extension version: bump `extension/manifest.json`, edit `RELEASE.md`, `npm run release`.
+New extension version: bump `extension/manifest.json`, edit `RELEASE.md`, push. A GitHub Action cuts the release; the extension notices within a day and offers the update. (`npm run release` does the same by hand.)
 
 ## The flow
 
@@ -65,8 +67,8 @@ Tap **Attiva** on notifications. That is the entire onboarding.
 
 ### 3. Computer — the extension
 
-Chrome (Edge and Brave work too) → `chrome://extensions` → **Developer mode** →
-**Load unpacked** → pick the `extension/` folder. Click its icon, enter the app
+Download the latest zip from [Releases](https://github.com/Neurone00/v-quicksell/releases), unzip. Chrome (Edge and Brave work too) → `chrome://extensions` → **Developer mode** →
+**Load unpacked** → pick the folder. Click its icon, enter the app
 URL and your `APP_SECRET`, save.
 
 The first time it opens `vinted.it/items/new` it reports Vinted's live form to
@@ -105,3 +107,11 @@ automated: that click is always yours.
 - **Same item twice is against Vinted's rules.** A/B-test titles sequentially on
   one listing (the app tracks view velocity), never with a duplicate.
 - Free Workers: 10ms CPU per request. Both scrapes stream and stop early to fit.
+
+## Brand
+
+The mark is a Q whose tail is a hanger hook; the wordmark is Fraunces; the palette is
+Vinted's ground with our own accent. Everything is written down in
+[brand/BRAND.md](brand/BRAND.md), and every colour, face, radius and easing lives in
+[brand/tokens.css](brand/tokens.css). To regenerate the banner: deploy
+`brand/banner.html` anywhere, open it, and read `window.__png`.

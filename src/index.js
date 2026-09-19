@@ -74,6 +74,7 @@ export default {
 
 async function route(p, req, env, ctx) {
   const db = env.DB;
+  const url = new URL(req.url);   // route() never had this; ?q= and ?test= both threw
 
   if (p === '/api/status') {
     const counts = await db.prepare('SELECT status, COUNT(*) n FROM items GROUP BY status').all();
@@ -146,7 +147,7 @@ async function route(p, req, env, ctx) {
 
   if (p === '/api/reach') return json(await V.reachability(env));
 
-  if (p === '/api/probe') return json(await V.probe(env));
+  if (p === '/api/probe') return json(await V.probe(env, url.searchParams.get('q')));
 
   // Escape hatch for when Google retires a model again: lists what this key can
   // use, and with ?test=1 times each candidate so you can see which are healthy.
@@ -255,14 +256,16 @@ async function route(p, req, env, ctx) {
 // One item per tick. Free-plan browser minutes are the scarce resource, and
 // nobody uploading a jumper cares about 60 seconds.
 async function drainQueue(env) {
+  // Claim in one statement. A SELECT then UPDATE lets two overlapping drains —
+  // the poller and a fresh upload, say — grab the same item and analyse it twice.
   const next = await env.DB
-    .prepare("SELECT id FROM items WHERE status='queued' ORDER BY id LIMIT 1")
+    .prepare(
+      `UPDATE items SET status='analyzing', started_at=datetime('now')
+       WHERE id = (SELECT id FROM items WHERE status='queued' ORDER BY id LIMIT 1)
+       RETURNING id`
+    )
     .first();
   if (!next) return null;
-  await env.DB
-    .prepare("UPDATE items SET status='analyzing', started_at=datetime('now') WHERE id=?")
-    .bind(next.id)
-    .run();
   await analyse(env, next.id);
   return next.id;
 }
@@ -317,13 +320,18 @@ async function analyse(env, id) {
 
     let comparables = [];
     let category = null;
+    let compsError = null;
     try {
       // No browser: this is a plain fetch, and browser minutes are precious.
       comparables = await V.searchComparables(env, a.search_query);
     } catch (e) {
-      // No session just means no market data. The vision work already succeeded —
-      // throwing it away would waste it and leave you with nothing to look at.
+      // No comparables just means no market data. The vision work already
+      // succeeded — throwing it away would waste it and leave nothing to look at.
+      // But record WHY: a silent [] is indistinguishable from "nothing matched",
+      // and pricing without comparables is the difference between a real number
+      // and a guess.
       comparables = [];
+      compsError = String(e.message).slice(0, 160);
       if (/SESSION/.test(String(e.message))) a.missing.push('vinted');
     }
 
@@ -345,7 +353,11 @@ async function analyse(env, id) {
         price.est_price, list, floor, list,
         JSON.stringify({ reasoning: price.reasoning, sold: comparables.filter((c) => c.sold).length, active: comparables.filter((c) => !c.sold).length, sample: comparables.slice(0, 8) }),
         JSON.stringify(a.missing),
-        a.missing.includes('vinted') ? 'Prezzo stimato senza comparabili: collega Vinted e tocca Riprova.' : null,
+        a.missing.includes('vinted')
+          ? 'Prezzo stimato senza comparabili: collega Vinted e tocca Riprova.'
+          : compsError ? `Nessun comparabile: ${compsError}`
+          : comparables.length === 0 ? `Nessun comparabile trovato per "${a.search_query}".`
+          : null,
         id
       )
       .run();

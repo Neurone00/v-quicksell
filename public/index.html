@@ -498,10 +498,10 @@ $('#file').onchange = async (e) => {
 
 navigator.serviceWorker?.register('/sw.js').catch(()=>{});
 refresh();
-setInterval(async () => {
-  if (!items.some(i => ['analyzing','queued'].includes(i.status))) return;
-  await refresh();
-  if (items.some(i => i.status === 'queued')) await api('/drain', { method:'POST' }).then(refresh);
+setInterval(() => {
+  if (uploading || items.some((i) => ['analyzing', 'queued'].includes(i.status))) {
+    refresh().then(() => { if (items.some((i) => i.status === 'queued')) pump(); });
+  }
 }, 6000);
 </script>
 </body>

@@ -473,10 +473,10 @@ export async function fetchStats(env, vintedId) {
 }
 
 // Setup helper: confirms the session works and the API shapes above still match.
-export async function probe(env) {
+export async function probe(env, query) {
   return (async () => {
     const me = await vapi(env, '/api/v2/users/current').catch((e) => ({ error: String(e.message).slice(0, 120) }));
-    const comps = await searchComparables(env, 'nike felpa', 10);
+    const comps = await searchComparables(env, query || 'nike felpa', 10);
     return {
       user: me.user?.login || me.login || me.error || '(sconosciuto)',
       comparables_found: comps.length,

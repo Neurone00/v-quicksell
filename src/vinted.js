@@ -304,8 +304,57 @@ async function csrf(env, cookie) {
   return token;
 }
 
-export async function vapi(env, path, init = {}) {
+// Vinted's access token lasts two hours; the refresh token seven days. Without
+// this the app works for one sitting and is dead by the next daily cron.
+// /web/api/auth/refresh is the endpoint that returns a fresh Set-Cookie.
+async function refreshSession(env) {
   const cookie = await cookieHeader(env);
+  const r = await fetch(`https://${env.VINTED_HOST}/web/api/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      cookie, 'user-agent': UA, accept: 'application/json, text/plain, */*',
+      referer: `https://${env.VINTED_HOST}/`, 'x-csrf-token': await csrf(env, cookie),
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!r.ok) throw new Error('SESSION_EXPIRED');
+
+  const jar = JSON.parse((await env.KV.get(SESSION_KEY)) || '[]');
+  const domain = '.' + env.VINTED_HOST.replace(/^www\./, '');
+  const setCookies = typeof r.headers.getSetCookie === 'function'
+    ? r.headers.getSetCookie()
+    : [r.headers.get('set-cookie')].filter(Boolean);
+  for (const sc of setCookies) {
+    const pair = sc.split(';')[0];
+    const i = pair.indexOf('=');
+    if (i < 1) continue;
+    const name = pair.slice(0, i).trim(), value = pair.slice(i + 1).trim();
+    const found = jar.find((c) => c.name === name);
+    if (found) found.value = value;
+    else jar.push({ name, value, domain, path: '/' });
+  }
+  await env.KV.put(SESSION_KEY, JSON.stringify(jar));
+  await env.KV.delete('csrf');   // a new session deserves a fresh token
+  return true;
+}
+
+// Cheap pre-flight: the JWT carries its own expiry, so a doomed call can be
+// avoided rather than spent discovering it is doomed.
+function accessExpired(cookie) {
+  const jwt = /access_token_web=([^;]+)/.exec(cookie)?.[1];
+  if (!jwt) return true;
+  try {
+    const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return !payload.exp || payload.exp - 60 < Math.floor(Date.now() / 1000);
+  } catch { return false; }
+}
+
+export async function vapi(env, path, init = {}, retried = false) {
+  let cookie = await cookieHeader(env);
+  if (!retried && accessExpired(cookie)) {
+    await refreshSession(env).catch(() => {});
+    cookie = await cookieHeader(env);
+  }
   const write = init.method && init.method !== 'GET';
   const r = await fetch(`https://${env.VINTED_HOST}${path}`, {
     method: init.method || 'GET',
@@ -322,6 +371,12 @@ export async function vapi(env, path, init = {}) {
     body: init.json ? JSON.stringify(init.json) : init.body,
     signal: AbortSignal.timeout(30000),
   });
+  // A 401 we did not predict: refresh once and try again before giving up.
+  if (r.status === 401 && !retried) {
+    await refreshSession(env);
+    return vapi(env, path, init, true);
+  }
+
   const text = await r.text();
   let body;
   try { body = JSON.parse(text); } catch { body = text.slice(0, 300); }
@@ -496,6 +551,45 @@ export async function fetchStats(env, vintedId) {
 }
 
 // Setup helper: confirms the session works and the API shapes above still match.
+// The access token lasts two hours; the refresh token seven days. Without a
+// refresh the app is dead between one session and the next daily cron, so this
+// finds the endpoint that mints a new one.
+export async function findRefresh(env) {
+  const cookie = await cookieHeader(env);
+  const token = /refresh_token_web=([^;]+)/.exec(cookie)?.[1] || '';
+  const candidates = [
+    ['POST', '/api/v2/token_refresh', null],
+    ['POST', '/oauth/token', { grant_type: 'refresh_token', refresh_token: token, client_id: 'web' }],
+    ['POST', '/web/api/auth/refresh', null],
+    ['POST', '/api/v2/sessions/refresh', null],
+    ['POST', '/api/v2/tokens/refresh', null],
+    ['POST', '/api/v2/users/refresh_token', null],
+  ];
+  const out = [];
+  for (const [method, path, body] of candidates) {
+    try {
+      const r = await fetch(`https://${env.VINTED_HOST}${path}`, {
+        method,
+        headers: {
+          cookie, 'user-agent': UA, accept: 'application/json, text/plain, */*',
+          referer: `https://${env.VINTED_HOST}/`,
+          'x-csrf-token': await csrf(env, cookie),
+          ...(body ? { 'content-type': 'application/json' } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(20000),
+      });
+      const setCookie = r.headers.get('set-cookie') || '';
+      out.push({
+        path, status: r.status,
+        sets_access_token: /access_token_web=/.test(setCookie),
+        body: (await r.text()).slice(0, 120),
+      });
+    } catch (e) { out.push({ path, error: String(e.message).slice(0, 80) }); }
+  }
+  return out;
+}
+
 export async function probe(env, query, testPhoto) {
   let photoTest = null;
   if (testPhoto) {

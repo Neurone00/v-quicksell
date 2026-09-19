@@ -147,6 +147,24 @@ async function route(p, req, env, ctx) {
 
   if (p === '/api/reach') return json(await V.reachability(env));
 
+  // One-off recon: what does the real new-listing flow expose?
+  if (p === '/api/uploadcfg') {
+    const paths = ['/api/v2/catalogs', '/api/v2/item_upload/configuration',
+      '/api/v2/item_upload/items/new', '/api/v2/colours', '/api/v2/statuses',
+      '/api/v2/sizes', '/api/v2/size_groups'];
+    const out = [];
+    for (const path of paths) {
+      try {
+        const r = await V.vapi(env, path);
+        out.push({ path, ok: true, keys: Array.isArray(r) ? `array(${r.length})` : Object.keys(r).slice(0, 8) });
+      } catch (e) { out.push({ path, error: String(e.message).slice(0, 110) }); }
+    }
+    return json(out);
+  }
+
+  // Which endpoint refreshes the 2h access token?
+  if (p === '/api/refreshtest') return json(await V.findRefresh(env));
+
   if (p === '/api/probe') return json(await V.probe(env, url.searchParams.get('q'), url.searchParams.get('photo')));
 
   // Escape hatch for when Google retires a model again: lists what this key can

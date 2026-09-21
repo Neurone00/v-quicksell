@@ -261,20 +261,34 @@ async function pickInput(input, want, mode, harvestKey) {
 // isn't one of the form's own fields", so its placeholder text doesn't matter.
 const FORM_INPUTS = new Set(['title', 'description', 'category', 'brand', 'size', 'condition', 'color', 'material', 'price', 'shoulder_width', 'height', 'photos']);
 async function pickBrand(input, brand) {
-  const findSearch = () => [...document.querySelectorAll('input')].find((i) => i !== input && i.offsetParent
-    && !FORM_INPUTS.has(i.id) && !FORM_INPUTS.has(i.name) && !/checkbox|radio|file|hidden/.test(i.type || ''));
-  let search = findSearch();
-  if (!search) { input.focus(); input.click(); await sleep2(500); search = findSearch(); }
+  // Candidate search boxes: visible text inputs that aren't the form's own
+  // fields AND aren't Vinted's site-wide "Cerca articoli" header search — that
+  // one comes first in the DOM and was swallowing the brand text.
+  const vis = () => [...document.querySelectorAll('input')].filter((i) => i !== input && i.offsetParent
+    && !FORM_INPUTS.has(i.id) && !FORM_INPUTS.has(i.name) && !/checkbox|radio|file|hidden/.test(i.type || '')
+    && !/cerca articoli/i.test(i.placeholder || ''));
+  const byPh = (arr) => arr.find((i) => /march|brand/i.test((i.placeholder || '') + (i.getAttribute('aria-label') || '')));
+  let search = byPh(vis());                            // flyout already open from a prior tick
+  if (!search) {
+    const before = new Set(vis());
+    input.focus(); input.click(); await sleep2(550);
+    const now = vis();
+    search = byPh(now) || now.find((i) => !before.has(i));   // the box that just appeared
+  }
   if (!search) return 'retry';
-  if (norm(search.value) !== norm(brand)) { type(search, brand); await sleep2(850); }
+  if (norm(search.value) !== norm(brand)) { type(search, brand); await sleep2(900); }
   const lists = [...document.querySelectorAll(menuSel)].filter((l) => l.offsetParent && optionEls(l).length);
   const menu = lists[lists.length - 1];
-  if (!menu) return 'retry';                           // results still loading
-  if (optChosen(menu, brand, 'brand')) { closeMenu(); return 'ok'; }
-  const hit = optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), brand, 'brand'));
-  if (!hit) return 'retry';
+  const hit = menu && optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), brand, 'brand'));
+  if (menu && optChosen(menu, brand, 'brand')) { closeMenu(); return 'ok'; }
+  if (!hit) {
+    send({ type: 'api', path: '/api/learn', method: 'POST', body: { url: location.pathname, brandProbe: {
+      brand, searchPlaceholder: search.placeholder, searchValue: search.value, menuFound: !!menu,
+      options: menu ? optionEls(menu).slice(0, 8).map(optLabel) : [] } } });
+    return 'retry';
+  }
   selectOption(hit);
-  await sleep2(300);
+  await sleep2(350);
   const closed = !menu.isConnected || menu.offsetParent === null;
   const ok = optChosen(menu, brand, 'brand') || closed || norm(input.value) === norm(brand);
   closeMenu();

@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.25
+
+**1.4.25** — marca: non scrivo più nella barra di ricerca in alto di Vinted (“Cerca articoli”) per sbaglio; uso il riquadro “Cerca marche” del menu. Se non trova la marca, manda all’app cosa ha visto.
+
 ## Quicksell 1.4.24
 
 **1.4.24** — tutti i menu ora usano un click “vero” (nativo): era la sequenza di eventi simulati a non registrarsi, non il pulsante scelto. Più affidabile anche per marca e condizioni.

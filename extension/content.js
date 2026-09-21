@@ -278,7 +278,11 @@ async function pickCategory(input, query) {
   input.focus(); input.click();
   await sleep2(450);
   const stem = (t, w) => t === w || (t.length >= 4 && w.length >= 4 && (t.startsWith(w.slice(0, 4)) || w.startsWith(t.slice(0, 4))));
-  for (let depth = 0; depth < 7; depth++) {
+  for (let depth = 0; depth < 8; depth++) {
+    // Below the root there's a "Cerca una categoria" box that flattens the tree —
+    // type the garment word so nested leaves (Camicie under Vestiti) show directly.
+    const search = [...document.querySelectorAll('input')].find((i) => /cerca.*categor/i.test(i.placeholder || '') && i.offsetParent);
+    if (search && pool[0] && norm(search.value) !== norm(pool[0])) { type(search, pool[0]); await sleep2(750); }
     const lists = [...document.querySelectorAll('[class*="List__list"], [role="listbox"], [role="menu"]')].filter((l) => l.offsetParent);
     const list = lists[lists.length - 1];
     if (!list) return 'retry';

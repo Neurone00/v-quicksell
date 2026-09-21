@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.19
+
+**1.4.19** — caricamento non va più in timeout: l’analisi gira in background e l’app la mostra quando è pronta. Categoria: uso il riquadro “Cerca una categoria” per arrivare al ramo giusto (es. Camicie) anche quando sta sotto “Vestiti”.
+
 ## Quicksell 1.4.18
 
 **1.4.18** — ora sceglie da sola anche la categoria: naviga l’albero di Vinted (Uomo → Camicie → …) seguendo le parole della categoria. Se non trova il ramo giusto si ferma e lo scegli tu.

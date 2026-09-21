@@ -278,7 +278,10 @@ async function route(p, req, env, ctx, url, user) {
     return json({ id });
   }
 
-  if (p === '/api/drain' && req.method === 'POST') return json({ processed: await drainQueue(env) });
+  // Analysis takes up to ~90s (Gemini). Run it in the background so the phone's
+  // request returns at once and the work survives the client disconnecting —
+  // otherwise the Worker was killed mid-analysis and items got stuck.
+  if (p === '/api/drain' && req.method === 'POST') { ctx.waitUntil(drainAll(env)); return json({ processed: false, bg: true }); }
 
   // What the extension fills on the computer: approved drafts, photos included.
   if (p === '/api/ready') {
@@ -409,6 +412,10 @@ async function drainQueue(env) {
   if (!next) return null;
   await analyse(env, next.id);
   return next.id;
+}
+// Drain every queued item (used in the background so one call clears the queue).
+async function drainAll(env) {
+  for (let i = 0; i < 25; i++) { if (!(await drainQueue(env))) break; }
 }
 
 // Basic post-production via the Images binding; raw photo if it caps out.

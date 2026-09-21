@@ -250,10 +250,57 @@ async function probe(input) {
   return { readonly: input.readOnly, appeared: snap };
 }
 
+// Category is a drill-down tree (Donna/Uomo → … → leaf), each level a
+// div[role=button].web_ui__Cell with a title; a leaf lacks the chevron/
+// "navigating" class and selects on click. Walk it greedily by the AI's
+// category words. Returns 'ok' (leaf picked), 'stopped' (no path — left for
+// you), 'retry' (menu not open).
+const catTitle = (cell) => norm(cell.querySelector('.web_ui__Cell__title')?.textContent || cell.textContent || '');
+function bestCategoryCell(cells, words) {
+  let best = null, score = 0;
+  for (const c of cells) {
+    const tt = catTitle(c);
+    if (!tt || tt.length > 40) continue;
+    const tw = tt.split(/[^a-z0-9]+/).filter(Boolean);
+    let s = 0;
+    for (const w of words) for (const t of tw) {
+      if (t === w) s += 3;
+      else if (t.length >= 4 && w.length >= 4 && (t.startsWith(w.slice(0, 4)) || w.startsWith(t.slice(0, 4)))) s += 1;
+    }
+    if (s > score) { score = s; best = c; }
+  }
+  return score > 0 ? best : null;
+}
+async function pickCategory(input, query) {
+  if (!input.value.trim() || /seleziona|scegli/i.test(input.value)) { /* not chosen yet */ } else return 'ok';
+  let pool = (Array.isArray(query) ? query.join(' ') : norm(query)).split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+  if (!pool.length) return 'stopped';
+  input.focus(); input.click();
+  await sleep2(450);
+  const stem = (t, w) => t === w || (t.length >= 4 && w.length >= 4 && (t.startsWith(w.slice(0, 4)) || w.startsWith(t.slice(0, 4))));
+  for (let depth = 0; depth < 7; depth++) {
+    const lists = [...document.querySelectorAll('[class*="List__list"], [role="listbox"], [role="menu"]')].filter((l) => l.offsetParent);
+    const list = lists[lists.length - 1];
+    if (!list) return 'retry';
+    const cells = [...list.querySelectorAll('[role="button"]')].filter((c) => c.offsetParent && c.querySelector('.web_ui__Cell__title'));
+    const best = bestCategoryCell(cells, pool);
+    if (!best) return depth === 0 ? 'retry' : 'stopped';   // no matching path — leave the rest to the user
+    const bt = catTitle(best).split(/[^a-z0-9]+/).filter(Boolean);
+    pool = pool.filter((w) => !bt.some((t) => stem(t, w)));  // consume matched words as we descend
+    const navigating = /navigating|with-chevron/.test(best.className) || !!best.querySelector('[class*="chevron"]');
+    seq(best);
+    await sleep2(500);
+    if (!navigating) { closeMenu(); return 'ok'; }   // leaf → category selected
+    if (!pool.length) return 'stopped';              // matched all words but still mid-tree — user picks the leaf
+  }
+  return 'stopped';
+}
+
 let autoStop = 0;
 function autoFill(it) {
   autoStop = Date.now() + 180000;
   const jobs = [
+    { key: 'Categoria', id: 'category', category: true, val: it.category_path || it.category_query },
     { key: 'Prezzo', id: 'price', price: true, val: it.list_price },
     { key: 'Taglia', id: 'size', val: it.size, mode: 'token' },
     { key: 'Condizioni', id: 'condition', val: it.condition, mode: 'phrase', harvest: 'condition' },
@@ -283,6 +330,11 @@ function autoFill(it) {
         const el = document.getElementById(j.id);
         if (!el) continue;                     // field not rendered yet (before category)
         if (j.price) { if (!el.value) type(el, String(j.val)); j.done = true; continue; }
+        if (j.category) {
+          const r = await pickCategory(el, j.val);
+          if (r === 'ok' || r === 'stopped' || (j.tries = (j.tries || 0) + 1) >= 8) j.done = true;
+          continue;
+        }
         const r = await pickInput(el, j.val, j.mode, j.harvest);
         // 'ok' = clicked once (or already set) → done. 'retry' = menu/options not
         // ready; try a few ticks, then give up and leave it for manual.
@@ -308,7 +360,7 @@ function hints(it, missing, photosOk) {
   return `${head('compilato')}
     ${photosOk === false ? `<div style="color:#B4690E;font-size:12px;margin-bottom:6px">Non ho trovato il caricatore foto: aggiungile tu dal telefono o dal computer.</div>` : ''}
     ${missing.length ? `<div style="color:#B4690E;font-size:12px;margin-bottom:6px">Campo non trovato: ${missing.join(', ')} — ho segnalato il modulo all'app.</div>` : ''}
-    <div id="qs-auto" style="font-size:13px;margin:2px 0 8px">Scegli una <b>categoria</b>: poi riempio prezzo, taglia, condizioni, colore, materiale e marca.</div>
+    <div id="qs-auto" style="font-size:13px;margin:2px 0 8px">Compilo tutto: categoria, prezzo, taglia, condizioni, colore, materiale, marca. Controlla e pubblica.</div>
     <div style="font-size:13px;line-height:1.7">
       <b>Categoria</b>: ${esc(it.category_path || '—')}<br>
       <b>Marca</b>: ${esc(it.brand || 'nessuna')}${it.brand_source === 'inferred' ? ' <small>(dedotta)</small>' : ''}<br>

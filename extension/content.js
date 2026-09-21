@@ -277,20 +277,24 @@ async function pickBrand(input, brand) {
   }
   if (!search) return 'retry';
   if (norm(search.value) !== norm(brand)) { type(search, brand); await sleep2(900); }
-  const lists = [...document.querySelectorAll(menuSel)].filter((l) => l.offsetParent && optionEls(l).length);
-  const menu = lists[lists.length - 1];
-  const hit = menu && optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), brand, 'brand'));
-  if (menu && optChosen(menu, brand, 'brand')) { closeMenu(); return 'ok'; }
+  // Don't guess a results container ("last visible list" was the page FOOTER,
+  // whose links became the "options"). The results are role=radio rows — scan
+  // those directly, anywhere visible. Exact name first, then a containing match.
+  const opts = () => [...document.querySelectorAll('[role="radio"], [role="option"], [role="checkbox"]')].filter((o) => o.offsetParent);
+  const isSel = (o) => o.getAttribute('aria-checked') === 'true' || !!o.querySelector('input:checked');
+  const findHit = () => opts().find((o) => norm(optLabel(o)) === norm(brand)) || opts().find((o) => matchOpt(norm(optLabel(o)), brand, 'brand'));
+  const chosen = () => norm(input.value) === norm(brand) || opts().some((o) => matchOpt(norm(optLabel(o)), brand, 'brand') && isSel(o));
+  if (chosen()) { closeMenu(); return 'ok'; }
+  const hit = findHit();
   if (!hit) {
     send({ type: 'api', path: '/api/learn', method: 'POST', body: { url: location.pathname, brandProbe: {
-      brand, searchPlaceholder: search.placeholder, searchValue: search.value, menuFound: !!menu,
-      options: menu ? optionEls(menu).slice(0, 8).map(optLabel) : [] } } });
+      brand, searchPlaceholder: search.placeholder, searchValue: search.value,
+      radiosSeen: opts().slice(0, 8).map(optLabel) } } });
     return 'retry';
   }
   selectOption(hit);
   await sleep2(350);
-  const closed = !menu.isConnected || menu.offsetParent === null;
-  const ok = optChosen(menu, brand, 'brand') || closed || norm(input.value) === norm(brand);
+  const ok = chosen() || !hit.isConnected || hit.offsetParent === null;   // selected, or the flyout closed on pick
   closeMenu();
   return ok ? 'ok' : 'retry';
 }

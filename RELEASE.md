@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.26
+
+**1.4.26** — marca: ora clicca il risultato (es. NAVIGARE). Prima cercava la marca tra i link del piè di pagina di Vinted invece che tra i risultati.
+
 ## Quicksell 1.4.25
 
 **1.4.25** — marca: non scrivo più nella barra di ricerca in alto di Vinted (“Cerca articoli”) per sbaglio; uso il riquadro “Cerca marche” del menu. Se non trova la marca, manda all’app cosa ha visto.

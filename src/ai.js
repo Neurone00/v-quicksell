@@ -66,6 +66,7 @@ const ANALYSIS_SCHEMA = {
     material: { type: 'string' },
     color: { type: 'string' },
     condition: { type: 'string' },
+    cover_index: { type: 'integer' },
     category_query: { type: 'string' },
     search_query: { type: 'string' },
     missing: { type: 'array', items: { type: 'string' } },
@@ -165,6 +166,7 @@ REGOLE:
 - size: SOLO dall'etichetta taglia. size_from_label=true solo se la leggi. Usa la notazione dell'etichetta (XS/S/M/L, o 38/40/42).
 - material: dall'etichetta di composizione se visibile.
 - condition: ESATTAMENTE uno tra "Nuovo con cartellino", "Nuovo senza cartellino", "Ottime", "Buone", "Discrete" (sono le etichette esatte di Vinted). Sii onesto: i resi e le recensioni negative costano piu di qualche euro.
+- cover_index: l'indice (0-based) della foto MIGLIORE da usare come copertina, tra quelle fornite nell'ordine ricevuto. La copertina ideale mostra il capo intero, a fuoco, ben illuminato, su sfondo pulito, dritto. Se la prima e' gia' la migliore, rispondi 0.
 - category_query: 2-4 parole per trovare la categoria Vinted, es "felpa donna cappuccio".
 - search_query: la query con cui cercare su Vinted articoli identici per confrontare i prezzi. Marca + tipo + taglia se noti.
 - missing: elenca i campi che NON riesci a determinare con certezza dalle foto (es "size", "brand", "material"). Se manca la foto dell'etichetta, dillo.`;

@@ -14,25 +14,51 @@ button{background:var(--calypso);color:#fff;border:0;border-radius:99px;padding:
 @media(prefers-color-scheme:dark){button{color:#04211f}}
 .card{background:var(--surface);border-radius:12px;padding:10px 12px;margin:8px 0;font-size:13px}
 .card a{color:var(--calypso);font-weight:600;text-decoration:none}
+.card a:hover{text-decoration:underline}
 .upd{background:var(--warn-soft);color:var(--warn)}.upd a{color:var(--warn)}
 small{color:var(--muted)}
 .qr{background:#fff;padding:10px;border-radius:12px;display:inline-block;margin:8px 0}
 .qr img{display:block;width:150px;height:150px;image-rendering:pixelated}
 .big{width:100%;margin-top:4px}
+.gear{margin-left:auto;background:none;border:0;color:var(--muted);cursor:pointer;padding:5px;margin:0;border-radius:10px;line-height:0}
+.gear:hover{background:var(--surface);color:var(--ink)}
+.gear svg{width:19px;height:19px}
+.price{font-weight:600;color:var(--ink)}
+.due{color:var(--warn);font-weight:600}
+.back{background:none;color:var(--calypso);border:0;padding:0;margin:2px 0 6px;font:600 13px Inter;cursor:pointer}
+.muted-row{color:var(--muted);font-size:12px;margin:2px 0}
 </style>
-<h1><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></svg>Quicksell</h1>
+
+<h1>
+  <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></svg>
+  Quicksell
+  <button id="gear" class="gear" title="Impostazioni" aria-label="Impostazioni">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</h1>
 <div id="upd"></div>
-<div id="conn" class="card"><small>Controllo il collegamento…</small></div>
-<div id="phone"></div>
-<details><summary style="cursor:pointer;font-size:12px;color:var(--muted);margin:6px 0">Avanzate</summary>
-<div id="setup">
-  <label>Indirizzo dell'app</label><input id="appUrl" placeholder="https://v-quicksell.neurone00.workers.dev">
-  <label>Chiave (solo per un'altra istanza)</label><input id="secret" type="password" placeholder="vuoto = usa il login dell'app">
-  <button id="save">Salva</button> <small id="st"></small>
-</div></details>
-<div id="due"></div>
-<h2>Se qualcosa non si compila</h2>
-<button id="diag" style="margin-top:0">Diagnostica la pagina Vinted aperta</button>
-<div id="diagout"></div>
+
+<div id="main">
+  <div id="conn"></div>
+  <div id="due"></div>
+  <h2 id="listhead" hidden>Annunci attivi</h2>
+  <div id="listings"></div>
+</div>
+
+<div id="settings" hidden>
+  <button id="back" class="back">← Annunci</button>
+  <h2>Account</h2>
+  <div id="accStatus" class="card"><small>…</small></div>
+  <div id="phone"></div>
+  <details><summary style="cursor:pointer;font-size:12px;color:var(--muted);margin:6px 0">Avanzate</summary>
+    <label>Indirizzo dell'app</label><input id="appUrl" placeholder="https://v-quicksell.neurone00.workers.dev">
+    <label>Chiave (solo per un'altra istanza)</label><input id="secret" type="password" placeholder="vuoto = usa il login dell'app">
+    <button id="save">Salva</button> <small id="st"></small>
+  </details>
+  <h2>Se qualcosa non si compila</h2>
+  <button id="diag" style="margin-top:0">Diagnostica la pagina Vinted aperta</button>
+  <div id="diagout"></div>
+</div>
+
 <script src="qrcode.js"></script>
 <script src="popup.js"></script>

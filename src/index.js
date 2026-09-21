@@ -438,6 +438,11 @@ async function analyse(env, id) {
     const enums = JSON.parse((await env.KV.get('vinted_enums')) || '{}');
     const a = await analysePhotos(env, b64, enums);
 
+    // Put the AI-picked best photo first — Vinted uses photo #1 as the cover.
+    const photos = JSON.parse(item.photos);
+    const ci = a.cover_index;
+    if (Number.isInteger(ci) && ci > 0 && ci < photos.length) photos.unshift(photos.splice(ci, 1)[0]);
+
     // Our own sales are the only true settled prices we have.
     const { results: mine } = await db
       .prepare("SELECT title, brand, size, condition, current_price FROM items WHERE user_id=? AND status='sold' LIMIT 20").bind(item.user_id).all();
@@ -453,12 +458,12 @@ async function analyse(env, id) {
 
     await db.prepare(
       `UPDATE items SET status=?, title=?, description=?, brand=?, brand_source=?, size=?, size_source=?,
-       category_path=?, condition=?, color=?, material=?, est_price=?, list_price=?, floor_price=?, current_price=?,
+       category_path=?, condition=?, color=?, material=?, photos=?, est_price=?, list_price=?, floor_price=?, current_price=?,
        comparables=?, needs=?, note=? WHERE id=?`
     ).bind(
       a.missing.length ? 'needs_input' : 'pending',
       a.title, a.description, a.brand || null, a.brand_source || null, a.size || null, a.size_source || null,
-      a.category_query || null, a.condition, a.color || null, a.material || null,
+      a.category_query || null, a.condition, a.color || null, a.material || null, JSON.stringify(photos),
       price.est_price, list, floor, list,
       JSON.stringify({ reasoning: price.reasoning, sold: comparables.filter((c) => c.sold).length,
         active: comparables.filter((c) => !c.sold).length, sample: comparables.slice(0, 8) }),

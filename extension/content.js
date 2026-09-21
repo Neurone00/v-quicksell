@@ -214,10 +214,15 @@ async function pickInput(input, want, mode, harvestKey) {
     if (all.length > (HARVEST[harvestKey]?.length || 0)) HARVEST[harvestKey] = all;
   }
   if (mode === 'brand') {
-    // The flyout has its OWN "Cerca marche" search box — type the brand THERE
-    // (not the field trigger), so Vinted loads brands beyond the famous few.
-    const search = menu.querySelector('input') || input;
-    if (norm(search.value) !== norm(want)) { type(search, want); await sleep2(550); }
+    // The "Cerca marche" box sits OUTSIDE the list waitMenu returns, so find it
+    // by placeholder — never fall back to the field trigger (typing there does
+    // nothing). Then re-acquire the results list, which renders fresh.
+    const search = [...document.querySelectorAll('input')].find((i) => /cerca.*(march|brand)/i.test(i.placeholder || '') && i.offsetParent)
+      || menu.querySelector('input');
+    if (!search) return 'retry';
+    if (norm(search.value) !== norm(want)) { type(search, want); await sleep2(700); }
+    const fresh = [...document.querySelectorAll(menuSel)].filter((l) => l.offsetParent && optionEls(l).length);
+    if (fresh.length) menu = fresh[fresh.length - 1];
   } else if (!optionEls(menu).some((o) => matchOpt(norm(optLabel(o)), want, mode))) {
     type(input, want.split(' ')[0]);                   // type-to-filter fields
     menu = (await waitMenu(before)) || menu; await sleep2(200);
@@ -235,9 +240,12 @@ async function pickInput(input, want, mode, harvestKey) {
   return ok ? 'ok' : 'retry';
 }
 // Re-scan the (live) menu for the matching option and whether it's now checked.
+// ANY matching option checked counts — size lists "L" twice (Consigliato + grid);
+// clicking one ticks the shared state, so checking only the first match read
+// the other one as unticked, retried, and the 2nd click un-ticked it.
 function optChosen(menu, want, mode) {
-  const opt = menu && optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), want, mode));
-  return !!(opt && (opt.getAttribute?.('aria-checked') === 'true' || opt.querySelector?.('input:checked')));
+  return !!menu && optionEls(menu).some((o) => matchOpt(norm(optLabel(o)), want, mode)
+    && (o.getAttribute?.('aria-checked') === 'true' || !!o.querySelector?.('input:checked')));
 }
 // Snapshot what a field's menu looks like, so a failure is debuggable without guessing.
 async function probe(input) {
@@ -278,6 +286,8 @@ async function pickCategory(input, query) {
   input.focus(); input.click();
   await sleep2(450);
   const stem = (t, w) => t === w || (t.length >= 4 && w.length >= 4 && (t.startsWith(w.slice(0, 4)) || w.startsWith(t.slice(0, 4))));
+  const trace = [];   // what each level looked like — reported if we stop short
+  const stop = (why) => { send({ type: 'api', path: '/api/learn', method: 'POST', body: { url: location.pathname, categoryTrace: { query, why, trace } } }); return 'stopped'; };
   for (let depth = 0; depth < 8; depth++) {
     // Below the root there's a "Cerca una categoria" box that flattens the tree —
     // type the garment word so nested leaves (Camicie under Vestiti) show directly.
@@ -288,16 +298,17 @@ async function pickCategory(input, query) {
     if (!list) return 'retry';
     const cells = [...list.querySelectorAll('[role="button"]')].filter((c) => c.offsetParent && c.querySelector('.web_ui__Cell__title'));
     const best = bestCategoryCell(cells, pool);
-    if (!best) return depth === 0 ? 'retry' : 'stopped';   // no matching path — leave the rest to the user
+    trace.push({ depth, search: !!search, pool: [...pool], seen: cells.slice(0, 10).map(catTitle), picked: best ? catTitle(best) : null });
+    if (!best) return depth === 0 ? 'retry' : stop('no cell matched the remaining words');   // leave the rest to the user
     const bt = catTitle(best).split(/[^a-z0-9]+/).filter(Boolean);
     pool = pool.filter((w) => !bt.some((t) => stem(t, w)));  // consume matched words as we descend
     const navigating = /navigating|with-chevron/.test(best.className) || !!best.querySelector('[class*="chevron"]');
     seq(best);
     await sleep2(500);
     if (!navigating) { closeMenu(); return 'ok'; }   // leaf → category selected
-    if (!pool.length) return 'stopped';              // matched all words but still mid-tree — user picks the leaf
+    if (!pool.length) return stop('ran out of words mid-tree');   // user picks the leaf
   }
-  return 'stopped';
+  return stop('too deep');
 }
 
 let autoStop = 0;

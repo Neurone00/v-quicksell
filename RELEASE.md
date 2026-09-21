@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.20
+
+**1.4.20** — marca: cerco davvero nel riquadro “Cerca marche” (prima scrivevo nel campo sbagliato). Taglia: la “L” compare due volte (Consigliato + griglia) e il controllo guardava quella sbagliata, de-selezionandola; sistemato. Categoria: se si ferma, manda all’app cosa ha visto a ogni livello.
+
 ## Quicksell 1.4.19
 
 **1.4.19** — caricamento non va più in timeout: l’analisi gira in background e l’app la mostra quando è pronta. Categoria: uso il riquadro “Cerca una categoria” per arrivare al ramo giusto (es. Camicie) anche quando sta sotto “Vestiti”.

@@ -1,0 +1,72 @@
+<title>Quicksell Logotype</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,600,60&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--calypso:#007782;--page:#EDF2F2;--surface:#fff;--ink:#15191A;--muted:#5A6566;--line:rgba(21,25,26,.12)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--calypso:#2FC4CE;--page:#0E1212;--surface:#171D1E;--ink:#F2F5F5;--muted:#9BA7A8;--line:rgba(242,245,245,.14)}}
+  :root[data-theme="dark"]{--calypso:#2FC4CE;--page:#0E1212;--surface:#171D1E;--ink:#F2F5F5;--muted:#9BA7A8;--line:rgba(242,245,245,.14)}
+  *{box-sizing:border-box} body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding-block:24px 48px;padding-left:20px;padding-right:20px}
+  h1{margin:0 0 4px;font:600 25px/1 Fraunces,Georgia,serif;font-variation-settings:'SOFT' 60;color:var(--calypso)}
+  h2{font:600 11px/1 Inter;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:26px 0 10px}
+  .g{border-radius:16px;padding:28px 24px;display:flex;align-items:center;justify-content:center;color:var(--calypso);overflow-x:auto}
+  .l{background:var(--surface);border:1px solid var(--line)} .d{background:#0E1212;color:#2FC4CE}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px} @media(max-width:640px){.two{grid-template-columns:1fr}}
+  svg.lt{display:block;max-width:100%;height:auto}
+  svg.lt text{font-family:Fraunces,Georgia,serif;font-weight:600;font-variation-settings:'SOFT' 60;letter-spacing:-.01em;fill:currentColor}
+  .hg{fill:none;stroke:currentColor;stroke-width:6.5;stroke-linecap:round;stroke-linejoin:round}
+  .note{color:var(--muted);font-size:13px;margin:6px 0 0}
+</style>
+<div class="wrap">
+  <h1>Logotype · la gruccia appesa alla Q</h1>
+  <p class="note">La coda della Q fa da asta: la gruccia ci si aggancia e pende sotto “Qu”. Stesso Fraunces del logotipo, gruccia a tratto unico come il marchio.</p>
+
+  <h2>B — gruccia appesa alla coda</h2>
+  <div class="two">
+    <div class="g l">
+      <svg class="lt" viewBox="0 0 720 240" width="720">
+        <text x="0" y="130" font-size="120">Quicksell</text>
+        <g class="hg" transform="translate(69 137)">
+          <path d="M0 12 V0 C0 -13 -18 -13 -18 2"/>
+          <path d="M0 12 V28"/>
+          <path d="M0 28 L-38 60 H38 Z"/>
+        </g>
+      </svg>
+    </div>
+    <div class="g d">
+      <svg class="lt" viewBox="0 0 720 240" width="720">
+        <text x="0" y="130" font-size="120">Quicksell</text>
+        <g class="hg" transform="translate(69 137)">
+          <path d="M0 12 V0 C0 -13 -18 -13 -18 2"/>
+          <path d="M0 12 V28"/>
+          <path d="M0 28 L-38 60 H38 Z"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <h2>B′ — la coda diventa il gancio</h2>
+  <div class="two">
+    <div class="g l">
+      <svg class="lt" viewBox="0 0 720 240" width="720">
+        <text x="0" y="130" font-size="120">Quicksell</text>
+        <path class="hg" d="M80 146 C88 154 100 154 100 145 C100 139 95 137 92 140"/>
+      </svg>
+    </div>
+    <div class="g d">
+      <svg class="lt" viewBox="0 0 720 240" width="720">
+        <text x="0" y="130" font-size="120">Quicksell</text>
+        <path class="hg" d="M80 146 C88 154 100 154 100 145 C100 139 95 137 92 140"/>
+      </svg>
+    </div>
+  </div>
+
+  <h2>Alla dimensione di intestazione</h2>
+  <div class="g l" style="justify-content:flex-start">
+    <svg class="lt" viewBox="0 0 720 240" width="240">
+      <text x="0" y="130" font-size="120">Quicksell</text>
+      <g class="hg" transform="translate(69 137)" style="stroke-width:7.5">
+        <path d="M0 12 V0 C0 -13 -18 -13 -18 2"/><path d="M0 12 V28"/><path d="M0 28 L-38 60 H38 Z"/>
+      </g>
+    </svg>
+  </div>
+</div>

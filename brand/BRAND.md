@@ -74,3 +74,17 @@ to do, not what went wrong. Docs and release notes in English, same plainness.
 
 Do: "Non ho letto la marca su un'etichetta. Puoi lasciare vuoto il campo."
 Don't: "Attenzione! Errore di validazione brand ⚠️"
+
+## Logo system (2026-09-21)
+
+Three versions, one voice.
+
+- **A — Logo:** mark + wordmark, the lockup above. Use whenever there is room (banner, release page, splash).
+- **B — Logotype with the hanger:** "Quicksell" in Fraunces with a **hanger hanging from the Q's tail** — the tail is the rail, the hanger hooks onto it and hangs under "Qu" in the descender space. Same monoline stroke as the mark (6.5 at 120 px type). For where the word stands alone: headers, signature, social. Not below 160 px wide. `brand/logotype-hanger.svg`, reference `brand/logotype.html`.
+  - **B′:** the tail itself closes into the hook — quieter, when the whole hanger is too much.
+- **C — Mark alone:** the Q-hanger in Calypso, or white on the Calypso tile; a stacked lockup (mark over the word) for square spaces.
+- **Mono:** Calypso, ink, or white. Never a gradient, never a shadow.
+
+**Payoff:** *Vendi prima.* — under or beside the logo, in Fraunces, never inside the mark. Alternates: *Dalla foto all'annuncio.* (descriptive) · *Fotografa. Il resto lo fa lui.* (conversational, phone/notifications).
+
+**Rejected:** the coin (3D render, glossy 2D, etched 2D) — "too much". Kept in `brand/coin*.{svg,html}` as reference only; not a logo.

@@ -25,7 +25,11 @@ function hsl2rgb(h, s, l) {
 
 function brand([r, g, b], dark) {
   let [h, s, l] = rgb2hsl(r, g, b);
-  if (s < .12) {                       // neutral: keep it neutral, cool-tinted; invert for dark
+  if (s < .12) {
+    // A dark neutral is a black STROKE (icon sets like useAnimations draw in
+    // black): that is the brand line, so it becomes Calypso — #007782 on light,
+    // #2FC4CE on dark. Light neutrals (paper, highlights) stay neutral.
+    if (l < .35) return dark ? hsl2rgb(CALYPSO_H, .62, .50) : hsl2rgb(CALYPSO_H, 1, .255);
     if (dark) l = 1 - l;
     return hsl2rgb(CALYPSO_H, .06, l);
   }

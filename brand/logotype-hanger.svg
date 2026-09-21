@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 240" width="720" height="240" color="#007782">
-  <!-- Quicksell logotype B: Fraunces 600 SOFT 60. The Q is the font's O with a drawn
-       tail that starts as a hook hanging on the bowl (the hook is the hanger, the
-       tail hangs from it), thin loop / thick tail, ball terminal. Live type: viewers
-       without Fraunces will substitute; brand/logotype.html is the reference. -->
-  <style>@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,600,60&amp;display=swap'); text{font-family:Fraunces,Georgia,serif;font-weight:600;font-variation-settings:'SOFT' 60;letter-spacing:-.01em;fill:currentColor} .hg{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}</style>
-  <text x="0" y="130" font-size="120">O</text><path class="hg" style="stroke-width:7" d="M58 124 A12 12 0 1 0 73 141"/><path class="hg" style="stroke-width:13" d="M73 141 C82 149 92 154 100 152"/><circle cx="105.5" cy="150.5" r="7" fill="currentColor" stroke="none"/><text x="86" y="130" font-size="120">uicksell</text>
-</svg>

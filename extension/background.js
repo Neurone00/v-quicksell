@@ -67,7 +67,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         reply({ ok: r.ok, data: d });
       } else if (msg.type === 'pending') {
         // Remember which draft is being filled in which tab, so the publish can be linked.
-        await chrome.storage.session.set({ pendingDraft: msg.id, pendingTab: sender.tab?.id ?? null });
+        await chrome.storage.session.set({ pendingDraft: msg.id, pendingTab: sender.tab?.id ?? null, pendingTitle: msg.title || '', pendingAt: Date.now() });
         reply({ ok: true });
       }
     } catch (e) { reply({ ok: false, error: String(e.message) }); }
@@ -81,13 +81,24 @@ chrome.tabs.onUpdated.addListener(async (tabId, info) => {
   if (!info.url) return;
   const m = /vinted\.it\/items\/(\d+)(?:-|$|\?)/.exec(info.url);
   if (!m) return;
-  const { pendingDraft, pendingTab } = await chrome.storage.session.get(['pendingDraft', 'pendingTab']);
+  const keys = ['pendingDraft', 'pendingTab', 'pendingTitle', 'pendingAt'];
+  const { pendingDraft, pendingTab, pendingTitle, pendingAt } = await chrome.storage.session.get(keys);
   if (!pendingDraft || (pendingTab != null && pendingTab !== tabId)) return;
+  // A stale pending must never link a listing browsed hours later.
+  if (pendingAt && Date.now() - pendingAt > 30 * 60 * 1000) { await chrome.storage.session.remove(keys); return; }
+  // Only OUR listing: Vinted's published URL slug is the title. Browsing any
+  // other item in this tab (…/9997163145-giubboni-nfl) shares no words with
+  // the draft's title and must not be linked.
+  const slug = (/vinted\.it\/items\/\d+-([a-z0-9-]+)/i.exec(info.url) || [])[1] || '';
+  const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const tw = norm(pendingTitle || '').split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
+  const sw = new Set(norm(slug).split('-'));
+  if (tw.length && tw.filter((w) => sw.has(w)).length < Math.min(2, tw.length)) return;
   try {
     await api(`/api/items/${pendingDraft}/published`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: info.url.split('?')[0] }),
     });
-    await chrome.storage.session.remove(['pendingDraft', 'pendingTab']);
+    await chrome.storage.session.remove(keys);
     chrome.notifications.create({ type: 'basic', iconUrl: 'icons/128.png', title: 'Quicksell', message: 'Annuncio collegato: da ora ne seguo il prezzo.' });
   } catch {}
 });

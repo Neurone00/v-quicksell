@@ -485,7 +485,7 @@ async function fillDraft(it) {
   const photosOk = injectPhotos(files);
   await sleep(1500);
   const missing = fillText(it);
-  await send({ type: 'pending', id: it.id });   // background links the listing on publish
+  await send({ type: 'pending', id: it.id, title: it.title });   // title lets the background verify the published URL is THIS listing   // background links the listing on publish
   show(hints(it, missing, photosOk));
   if (missing.length) learn();
 }
@@ -524,7 +524,7 @@ async function onLocalPhotos(files) {
     const it = r?.ok && (r.data.items || []).find((x) => x.id === up.data.id);
     if (it && !['queued', 'analyzing'].includes(it.status)) {
       const missing = fillText(it);
-      await send({ type: 'pending', id: it.id });
+      await send({ type: 'pending', id: it.id, title: it.title });   // title lets the background verify the published URL is THIS listing
       return show(hints(it, missing, true));
     }
   }

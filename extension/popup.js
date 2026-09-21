@@ -89,12 +89,32 @@ async function load() {
   const b = $('#batch');
   if (b) b.onclick = () => { send({ type: 'batch' }); b.textContent = 'Avviato — ti avviso alla fine'; b.disabled = true; };
 
-  // Active listings.
+  // Active listings: photo, one-line title, price — and a way to fix a link
+  // that points at the wrong Vinted item.
   listhead.hidden = false;
   listings.innerHTML = live.length
-    ? live.map((i) => `<div class="card"><a href="${i.vinted_url}" target="_blank">${esc(i.title)}</a><br>
-        <span class="price">${i.current_price} €</span> <small>· min ${i.floor_price} €${i.due_price ? ' · <span class="due">ribasso oggi</span>' : ''}</small></div>`).join('')
+    ? live.map((i) => `<div class="card listing">
+        <img class="th" id="th-${i.id}" alt="">
+        <div class="txt">
+          <a class="t" href="${i.vinted_url}" target="_blank" title="${esc(i.title)}">${esc(i.title)}</a>
+          <div><span class="price">${i.current_price} €</span> <small>· min ${i.floor_price} €${i.due_price ? ' · <span class="due">ribasso oggi</span>' : ''}</small></div>
+          <button class="fix" data-fix="${i.id}">Correggi link</button>
+        </div></div>`).join('')
     : `<div class="card"><small>Nessun annuncio attivo. Pubblica un capo, poi collega l'annuncio: comparirà qui e da lì l'app segue il prezzo.</small></div>`;
+  // Thumbnails: the background holds the account key, so it fetches the photo
+  // and hands back a data URL the popup can show.
+  for (const i of live) {
+    const key = (i.photos || [])[0];
+    if (key) send({ type: 'photo', key }).then((r) => { const im = document.getElementById('th-' + i.id); if (r?.ok && im) im.src = r.data; });
+  }
+  for (const b of document.querySelectorAll('button[data-fix]')) b.onclick = async () => {
+    const url = window.prompt("Incolla il link dell'annuncio giusto (…vinted.it/items/…):");
+    if (!url) return;
+    if (!/vinted\.it\/items\/\d+/.test(url)) { alert('Non sembra un link a un annuncio Vinted.'); return; }
+    b.textContent = 'Collego…';
+    const r = await send({ type: 'api', path: `/api/items/${b.dataset.fix}/published`, method: 'POST', body: { url: url.trim() } });
+    if (r?.ok) load(); else { b.textContent = 'Riprova'; }
+  };
 }
 
 // Diagnostics: ask the content script on the active Vinted tab what it sees.

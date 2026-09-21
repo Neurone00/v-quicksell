@@ -80,8 +80,8 @@ Don't: "Attenzione! Errore di validazione brand ⚠️"
 Three versions, one voice.
 
 - **A — Logo:** mark + wordmark, the lockup above. Use whenever there is room (banner, release page, splash).
-- **B — Logotype with the hanger:** "Quicksell" in Fraunces with a **hanger hanging from the Q's tail** — the tail is the rail, the hanger hooks onto it and hangs under "Qu" in the descender space. Same monoline stroke as the mark (6.5 at 120 px type). For where the word stands alone: headers, signature, social. Not below 160 px wide. `brand/logotype-hanger.svg`, reference `brand/logotype.html`.
-  - **B′:** the tail itself closes into the hook — quieter, when the whole hanger is too much.
+- **B — Logotype with the Q-hanger:** "Quicksell" in Fraunces where the Q's **tail starts as a hook hanging on the bowl** — the hook is the hanger, the tail hangs from it. Built as the font's O plus a drawn tail (thin loop ≈7 / thick tail ≈13 at 120 px, ball terminal like Fraunces' own). For where the word stands alone: headers, signature, social. Not below 140 px wide. `brand/logotype-hanger.svg`, reference `brand/logotype.html`.
+  - **B′:** no ball terminal. **B″:** uniform stroke (reads more "wire hanger"). Both allowed when the drop is too much (small sizes, engraving, embroidery).
 - **C — Mark alone:** the Q-hanger in Calypso, or white on the Calypso tile; a stacked lockup (mark over the word) for square spaces.
 - **Mono:** Calypso, ink, or white. Never a gradient, never a shadow.
 

@@ -83,6 +83,8 @@ button{background:var(--calypso);color:#fff;border:0;border-radius:99px;padding:
   font:600 15px/1 Inter;cursor:pointer;transition:transform .18s var(--overshoot),filter .18s}
 button:hover{filter:brightness(1.08)} button:active{transform:scale(.96)}
 button.sec{background:transparent;color:var(--muted);box-shadow:inset 0 0 0 1.5px var(--line)}
+button.rm{margin:0 0 0 auto;padding:4px 8px;background:transparent;color:var(--muted);box-shadow:none;font-size:15px;line-height:1;border-radius:8px}
+button.rm:hover{color:var(--ink);background:var(--line)}
 button.warn{background:var(--warn);color:#fff}
 button:disabled{opacity:.45;pointer-events:none}
 @media(prefers-color-scheme:dark){button{color:#04211f}button.warn{color:#1a1206}}
@@ -324,9 +326,16 @@ window.enablePush = async () => {
 };
 
 function render(duringOnboarding) {
-  $('#list').innerHTML = items.map(card).join('') || (duringOnboarding ? '' :
+  // Already listed (live) or sold items are done here — they live in the
+  // extension's "annunci attivi". The phone only shows what still needs you.
+  const shown = items.filter((i) => !['live', 'sold'].includes(i.status));
+  $('#list').innerHTML = shown.map(card).join('') || (duringOnboarding ? '' :
     `<div class="empty">${anim('empty', 'hanger', 120)}<b>Niente da vendere, per ora</b>Fotografa un capo — meglio se includi l'etichetta —<br>oppure condividi le foto dalla galleria a Quicksell.</div>`);
 }
+window.removeItem = async (id) => {
+  if (!confirm('Rimuovere questo articolo? Le foto verranno cancellate.')) return;
+  await act(id, 'reject');
+};
 
 const thumbs = (i) => `<div class="thumbs">${i.photos.map(k => `<img src="/api/photo/${encodeURIComponent(k)}" loading="lazy" alt="">`).join('')}</div>`;
 const copyBar = (i) => `<div class="row" style="flex-wrap:wrap;gap:8px;margin-top:8px">
@@ -336,7 +345,7 @@ const copyBar = (i) => `<div class="row" style="flex-wrap:wrap;gap:8px;margin-to
 
 function card(i) {
   const open = `<div class="card${i.due_price != null ? ' due' : ''}" data-s="${i.status}">`;
-  const head = (x = '') => `<div class="row"><span class="badge ${i.status}">${LABEL[i.status]}</span>${x}</div>`;
+  const head = (x = '') => `<div class="row"><span class="badge ${i.status}">${LABEL[i.status]}</span>${x}<button class="rm" title="Rimuovi" aria-label="Rimuovi" onclick="removeItem(${i.id})">✕</button></div>`;
 
   if (i.status === 'analyzing' || i.status === 'queued')
     return `${open}${head('<span class="sp"></span>')}${thumbs(i)}</div>`;

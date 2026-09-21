@@ -385,7 +385,9 @@ async function route(p, req, env, ctx, url, user) {
       return json({ ok: true });
     }
     if (m[2] === 'reject') {
-      await db.prepare("UPDATE items SET status='archived' WHERE id=?").bind(id).run();
+      const it = await db.prepare('SELECT photos FROM items WHERE id=?').bind(id).first();
+      for (const k of JSON.parse(it?.photos || '[]')) await env.KV.delete(PHOTO + k);   // free the storage
+      await db.prepare("UPDATE items SET status='archived', photos='[]' WHERE id=?").bind(id).run();
       return json({ ok: true });
     }
     if (m[2] === 'retry') {

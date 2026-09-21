@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.17
+
+**1.4.17** — marca: ora la cerco nel riquadro “Cerca marche” del menu e la scelgo (prima non partiva). Taglia: sistemato il caso in cui si de-selezionava. Nell’app puoi rimuovere un articolo (✕) e gli articoli già pubblicati non si mostrano più.
+
 ## Quicksell 1.4.16
 
 **1.4.16** — due novità: l’app sceglie da sola la foto migliore come copertina; e il pannello dell’estensione mostra i tuoi annunci attivi, con account, telefono e diagnostica spostati nel menu ⚙.

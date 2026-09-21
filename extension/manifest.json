@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Quicksell per Vinted",
-  "version": "1.4.16",
+  "version": "1.4.17",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzqNLYwftnjBjyrHF+XxexDWyjbFOn/3TeekcI/LYuLqgCDrXPHH3s4uH4blpBY8fuy1WUNAMRx94wbrSbgkKjLF3UryNrXJt19CiUUoNJGe8QUk7A7o6KZEZ+lBDbPl/hf5nmbL6jwNSES7URvdbudtjshIs4dpqcVViw7ydYbKX2UXddRSf2KKR7CJPsZjqrKeSctIAz7gLOiBZoPGFqGksTfRqoRqpXA8fd+rPv2VR9a3lNg64Yb2GYcmY5wiRbHC/dmWoi0Wl4VPOz2fWJ0ek1lHrqjf+DL365gGBiqNGKiQgUr0b3aZMZwCM2ZrXY9xLgLCkZptnIMdWfPXMMQIDAQAB",
   "description": "Aggiungi le foto a un nuovo annuncio Vinted: titolo, descrizione e prezzo si compilano da soli. I ribassi sono un click.",
   "permissions": [

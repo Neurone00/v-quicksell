@@ -202,38 +202,42 @@ const HARVEST = {};
 // Open the input's menu and click the option matching `want`. Returns
 // 'ok' | 'nomatch' (menu opened, no option fit) | 'nomenu' (couldn't open).
 async function pickInput(input, want, mode, harvestKey) {
-  if (input.value.trim()) return 'ok';                 // already chosen — don't touch
+  // Non-brand: if the trigger already shows a real value, it's set — leave it.
+  // (Brand's trigger can show typed-but-unselected text, so don't trust it there.)
+  if (mode !== 'brand' && input.value.trim() && !/seleziona|scegli/i.test(input.value)) return 'ok';
   const before = new Set(document.querySelectorAll(menuSel));
   input.focus(); input.click();
   let menu = await waitMenu(before);
-  if (menu && harvestKey) {                            // full list, before any type-filter
-    // keep only short, clean labels — options with a long description (e.g.
-    // condizioni) would pollute the enum we send the AI.
+  if (!menu) return 'retry';
+  if (harvestKey) {                                    // full list, before any type-filter
     const all = optionEls(menu).map((o) => optLabel(o)).filter((t) => t && t.length <= 28);
     if (all.length > (HARVEST[harvestKey]?.length || 0)) HARVEST[harvestKey] = all;
   }
-  // brand (and any type-to-filter field): narrow by typing, then re-scan
-  if (mode === 'brand' || (menu && !optionEls(menu).some((o) => matchOpt(norm(optLabel(o)), want, mode)))) {
-    type(input, mode === 'first' ? want.split(' ')[0] : want);
-    menu = (await waitMenu(before)) || menu;
+  if (mode === 'brand') {
+    // The flyout has its OWN "Cerca marche" search box — type the brand THERE
+    // (not the field trigger), so Vinted loads brands beyond the famous few.
+    const search = menu.querySelector('input') || input;
+    if (norm(search.value) !== norm(want)) { type(search, want); await sleep2(550); }
+  } else if (!optionEls(menu).some((o) => matchOpt(norm(optLabel(o)), want, mode))) {
+    type(input, want.split(' ')[0]);                   // type-to-filter fields
+    menu = (await waitMenu(before)) || menu; await sleep2(200);
   }
-  if (!menu) return 'retry';
+  // Already selected (this or a prior tick)? Don't click — a 2nd click unchecks a box.
+  if (optChosen(menu, want, mode)) { closeMenu(); return 'ok'; }
   const hit = optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), want, mode));
-  if (!hit) { closeMenu(); return 'retry'; }         // options maybe still loading
-  if (isChosen(hit, input)) { closeMenu(); return 'ok'; }   // a prior run already set it
-  // Click the matched option EXACTLY ONCE, then we're done. Never re-click:
-  // verifying a checkbox's state is unreliable, and a second click unchecks it
-  // (the size/material flicker). One deterministic click, then leave it.
+  if (!hit) { closeMenu(); return 'retry'; }           // options still loading / typed brand not back yet
   selectOption(hit);
-  await sleep2(200);
+  await sleep2(250);
+  // Verify by RE-SCANNING (React replaces the node on select, so a saved `hit`
+  // ref goes stale). Retry if not registered; optChosen stops a second click.
+  const ok = optChosen(menu, want, mode) || (mode !== 'brand' && input.value.trim() && !/seleziona|scegli/i.test(input.value));
   closeMenu();
-  return 'ok';
+  return ok ? 'ok' : 'retry';
 }
-// Is this option (or its field) already selected?
-function isChosen(hit, fieldInput) {
-  return !!((fieldInput && fieldInput.value.trim())
-    || hit.getAttribute?.('aria-checked') === 'true'
-    || hit.querySelector?.('input:checked'));
+// Re-scan the (live) menu for the matching option and whether it's now checked.
+function optChosen(menu, want, mode) {
+  const opt = menu && optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), want, mode));
+  return !!(opt && (opt.getAttribute?.('aria-checked') === 'true' || opt.querySelector?.('input:checked')));
 }
 // Snapshot what a field's menu looks like, so a failure is debuggable without guessing.
 async function probe(input) {

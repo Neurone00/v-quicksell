@@ -158,13 +158,12 @@ function selectOption(o) {
   const el = (o.matches && o.matches('[role="checkbox"], [role="radio"], [role="option"]')) ? o
     : (o.querySelector('[role="checkbox"], [role="radio"], [role="option"]') || o);
   el.focus && el.focus();
-  // Size grid buttons (data-testid …grid-option…, handlers onClick/onKeyDown):
-  // a plain native .click() is what provably selects them (sets the field to
-  // "L"); the extra synthetic pointer events are unnecessary there.
-  if (/grid-option/.test(el.getAttribute?.('data-testid') || '')) { el.click(); return; }
-  seq(el);
+  // A native .click() is what provably registers with Vinted's React handlers
+  // (verified on the size grid: sets the field; a synthetic pointer/mouse
+  // sequence did not reliably). Use it for every option — it's a real click.
+  el.click();
   if (el.getAttribute && el.getAttribute('role') === 'radio') {
-    const lbl = el.querySelector('label'); if (lbl) seq(lbl);
+    const lbl = el.querySelector('label'); if (lbl) lbl.click();
     el.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
     el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
   }

@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.24
+
+**1.4.24** — tutti i menu ora usano un click “vero” (nativo): era la sequenza di eventi simulati a non registrarsi, non il pulsante scelto. Più affidabile anche per marca e condizioni.
+
 ## Quicksell 1.4.23
 
 **1.4.23** — taglia: uso esattamente il click che funziona (verificato sul pulsante della griglia) e controllo il valore del campo, non lo stato del pulsante che non si aggiorna.

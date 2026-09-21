@@ -89,6 +89,35 @@ function schemaWith(enums) {
   return s;
 }
 
+// Self-heal for the form filler. When the extension's deterministic filler
+// can't set a field, it sends a compact accessibility snapshot of the open
+// flyout (index, role, name, state) and the target value; the model answers
+// with the one minimal action. Runs only on failure, so a Vinted redesign
+// costs a model call instead of a code release.
+const HEAL_SCHEMA = {
+  type: 'object',
+  properties: {
+    action: { type: 'string', enum: ['click', 'type_then_click', 'none'] },
+    index: { type: 'integer' },
+    text: { type: 'string' },
+    confidence: { type: 'number' },
+  },
+  required: ['action', 'confidence'],
+};
+export async function healChoice(env, field, want, snapshot) {
+  const rows = snapshot.map((s) => `[${s.i}] ${s.role || s.tag} "${s.name}"${s.checked ? ` (checked=${s.checked})` : ''}${s.isInput ? ' (casella di testo)' : ''}`).join('\n');
+  const text = `Stai compilando il modulo "Vendi" di Vinted. Campo: ${field}. Valore da impostare: "${want}".
+Controlli visibili nel menu aperto, uno per riga come [indice] ruolo "nome" (stato):
+${rows}
+
+Rispondi con l'azione MINIMA:
+- "click" con index = l'opzione che corrisponde al valore (stesso significato, anche se scritto diversamente: maiuscole, "Ottime" per "Ottime condizioni", "Bianco" per "bianco panna").
+- "type_then_click" se il valore non e' tra le opzioni ma c'e' una casella di ricerca: index = la casella, text = cosa scrivere; l'opzione verra' cliccata dopo.
+- "none" se nessun controllo corrisponde. Mai scegliere link del pie' di pagina, cookie, o pulsanti Salva/Carica.
+confidence tra 0 e 1.`;
+  return gemini(env, [{ text }], HEAL_SCHEMA);
+}
+
 // Photos in, a full Italian Vinted listing out. `enums` = Vinted's real option
 // lists (from KV), when the extension has harvested them yet.
 export async function analysePhotos(env, images, enums) {

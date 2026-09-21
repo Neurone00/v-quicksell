@@ -142,15 +142,18 @@ const sleep2 = (ms) => new Promise((r) => setTimeout(r, ms));
 // the clean value to match and harvest.
 // Value of an option: aria-label (size/color grids) or the Cell title
 // (condition: aria-label is null, title holds "Ottime"/"Nuovo con cartellino").
+// Never a class name (hashed CSS modules change on any Vinted redeploy):
+// aria-label, then a title testid / heading, then the first line of text
+// (a title precedes its description in the DOM).
+const firstLine = (o) => (o.textContent || '').trim().split('\n').map((l) => l.trim()).find(Boolean) || '';
 const optLabel = (o) => (o.getAttribute && o.getAttribute('aria-label'))
-  || (o.querySelector && (o.querySelector('[class*="Cell__title"], [data-testid$="--title"]')?.textContent || '').trim())
-  || o.textContent.trim();
+  || (o.querySelector && (o.querySelector('[data-testid$="--title"], [role="heading"], h1, h2, h3, h4, h5, h6')?.textContent || '').trim())
+  || firstLine(o);
 function optionEls(scope) {
   let els = [...scope.querySelectorAll('[role="option"], [role="checkbox"], [role="radio"]')];
-  if (!els.length) els = [...scope.querySelectorAll('li, label, button, [data-testid*="option"], [class*="option"]')];
+  if (!els.length) els = [...scope.querySelectorAll('li, label, button, [data-testid*="option"]')];
   return els.filter((o) => o.offsetParent !== null && optLabel(o) && optLabel(o).length < 60);
 }
-const seq = (t) => { for (const ev of ['pointerover', 'pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) t.dispatchEvent(new MouseEvent(ev, { bubbles: true, cancelable: true, view: window })); };
 // Click the interactive option (role=checkbox/radio div). For radios also nudge
 // the inner label + keyboard — safe because a radio never un-selects; checkboxes
 // get only the single click (a second toggle would UNcheck them).
@@ -168,7 +171,7 @@ function selectOption(o) {
     el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
   }
 }
-const menuSel = '[role="listbox"], [role="dialog"], [role="menu"], [class*="dropdown"], [class*="menu"], [class*="popover"], ul';
+const menuSel = '[role="listbox"], [role="dialog"], [role="menu"], [role="list"], ul, ol';   // roles + list elements only, no class names
 // A menu that appeared after we focused the input (not one already open).
 async function waitMenu(before) {
   for (let i = 0; i < 16; i++) {
@@ -322,7 +325,7 @@ async function probe(input) {
 // "navigating" class and selects on click. Walk it greedily by the AI's
 // category words. Returns 'ok' (leaf picked), 'stopped' (no path — left for
 // you), 'retry' (menu not open).
-const catTitle = (cell) => norm(cell.querySelector('.web_ui__Cell__title')?.textContent || cell.textContent || '');
+const catTitle = (cell) => norm(firstLine(cell));   // a category cell's only text is its title
 function bestCategoryCell(cells, words) {
   let best = null, score = 0;
   for (const c of cells) {
@@ -352,22 +355,51 @@ async function pickCategory(input, query) {
     // type the garment word so nested leaves (Camicie under Vestiti) show directly.
     const search = [...document.querySelectorAll('input')].find((i) => /cerca.*categor/i.test(i.placeholder || '') && i.offsetParent);
     if (search && pool[0] && norm(search.value) !== norm(pool[0])) { type(search, pool[0]); await sleep2(750); }
-    const lists = [...document.querySelectorAll('[class*="List__list"], [role="listbox"], [role="menu"]')].filter((l) => l.offsetParent);
+    const lists = [...document.querySelectorAll('[role="list"], [role="listbox"], [role="menu"], ul, ol')].filter((l) => l.offsetParent && l.querySelector('[role="button"]'));
     const list = lists[lists.length - 1];
     if (!list) return 'retry';
-    const cells = [...list.querySelectorAll('[role="button"]')].filter((c) => c.offsetParent && c.querySelector('.web_ui__Cell__title'));
+    const cells = [...list.querySelectorAll('[role="button"]')].filter((c) => c.offsetParent && catTitle(c) && catTitle(c).length < 40);
     const best = bestCategoryCell(cells, pool);
     trace.push({ depth, search: !!search, pool: [...pool], seen: cells.slice(0, 10).map(catTitle), picked: best ? catTitle(best) : null });
     if (!best) return depth === 0 ? 'retry' : stop('no cell matched the remaining words');   // leave the rest to the user
     const bt = catTitle(best).split(/[^a-z0-9]+/).filter(Boolean);
     pool = pool.filter((w) => !bt.some((t) => stem(t, w)));  // consume matched words as we descend
-    const navigating = /navigating|with-chevron/.test(best.className) || !!best.querySelector('[class*="chevron"]');
-    seq(best);
-    await sleep2(500);
-    if (!navigating) { closeMenu(); return 'ok'; }   // leaf → category selected
+    best.click();                                    // native click, as proven
+    await sleep2(550);
+    // Leaf vs branch by BEHAVIOUR, not by class: a leaf sets the field.
+    if (input.value.trim() && !/seleziona|scegli/i.test(input.value)) { closeMenu(); return 'ok'; }
     if (!pool.length) return stop('ran out of words mid-tree');   // user picks the leaf
   }
   return stop('too deep');
+}
+
+// ---- self-heal: the model reads the open flyout and picks the control -------
+// Runs only after the deterministic filler gave up. Sends a compact
+// accessibility snapshot (role, name, state — never raw HTML) of the visible
+// controls; applies the one action it returns; reports the outcome.
+const interactive = () => [...document.querySelectorAll('input:not([type="hidden"]), [role="radio"], [role="checkbox"], [role="option"], [role="button"], button')]
+  .filter((x) => x.offsetParent && !FORM_INPUTS.has(x.id) && !/cerca articoli/i.test(x.placeholder || '')).slice(0, 80);
+async function heal(j, input) {
+  input.focus(); input.click(); await sleep2(500);
+  let items = interactive();
+  const snapshot = items.map((x, i) => ({ i, tag: x.tagName.toLowerCase(), role: x.getAttribute('role') || x.type || '',
+    name: (optLabel(x) || x.placeholder || '').slice(0, 50), checked: x.getAttribute('aria-checked') || undefined, isInput: x.tagName === 'INPUT' }));
+  const r = await send({ type: 'api', path: '/api/heal', method: 'POST', body: { field: j.key, want: String(j.val), snapshot } });
+  const a = r?.ok && r.data;
+  let outcome = 'no-answer';
+  if (a && a.action !== 'none' && a.confidence >= 0.5) {
+    if (a.action === 'type_then_click' && items[a.index]) {
+      type(items[a.index], a.text || String(j.val)); await sleep2(900);
+      items = interactive();
+      const tgt = items.find((x) => norm(optLabel(x)) === norm(a.text || j.val)) || items.find((x) => norm(optLabel(x)).includes(norm(a.text || j.val)));
+      if (tgt) { tgt.click(); outcome = 'typed+clicked'; } else outcome = 'typed, no target';
+    } else if (items[a.index]) { items[a.index].click(); outcome = 'clicked'; }
+    await sleep2(450);
+  }
+  const ok = !!(input.value.trim() && !/seleziona|scegli/i.test(input.value));
+  closeMenu();
+  send({ type: 'api', path: '/api/learn', method: 'POST', body: { url: location.pathname, healed: { field: j.key, want: j.val, answer: a || null, outcome, ok } } });
+  return ok;
 }
 
 let autoStop = 0;
@@ -411,8 +443,10 @@ function autoFill(it) {
         }
         const r = j.mode === 'brand' ? await pickBrand(el, j.val) : await pickInput(el, j.val, j.mode, j.harvest);
         // 'ok' = selected (or already set) → done. 'retry' = menu/options not
-        // ready; try a few ticks, then give up and leave it for manual.
-        if (r === 'ok' || (j.tries = (j.tries || 0) + 1) >= 8) j.done = true;
+        // ready; try a few ticks. After that, ask the server's model to look at
+        // the open flyout and say what to click (self-heal), then leave it.
+        if (r === 'ok') j.done = true;
+        else if ((j.tries = (j.tries || 0) + 1) >= 6) { await heal(j, el); j.done = true; }
       }
     } finally { running = false; }
     if (jobs.every((j) => j.done) || Date.now() > autoStop) finish();

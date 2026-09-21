@@ -1,5 +1,5 @@
 import * as V from './vinted.js';
-import { analysePhotos, priceFromComparables } from './ai.js';
+import { analysePhotos, priceFromComparables, healChoice } from './ai.js';
 import { notify } from './push.js';
 import { listPrice, nextPrice, round9 } from './price.js';
 
@@ -314,6 +314,15 @@ async function route(p, req, env, ctx, url, user) {
     await env.KV.put('learned', JSON.stringify([...prev, { at: new Date().toISOString(), ...body }].slice(-10)));
     return json({ ok: true });
   }
+  // Self-heal: the extension sends the open flyout's accessibility snapshot and
+  // the target value; the model answers with the one control to act on.
+  if (p === '/api/heal' && req.method === 'POST') {
+    const { field, want, snapshot } = await req.json().catch(() => ({}));
+    if (!field || !want || !Array.isArray(snapshot)) return json({ error: 'bad request' }, 400);
+    try { return json(await healChoice(env, String(field), String(want), snapshot.slice(0, 80))); }
+    catch (e) { return json({ action: 'none', confidence: 0, error: String(e.message).slice(0, 120) }); }
+  }
+
   if (p === '/api/learned') return json(JSON.parse((await env.KV.get('learned')) || '[]'));
 
   // The extension harvests Vinted's real dropdown options and posts them here;

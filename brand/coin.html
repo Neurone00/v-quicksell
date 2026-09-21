@@ -1,0 +1,138 @@
+<title>Quicksell Coin</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,600,60&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --calypso:#007782; --page:#EDF2F2; --surface:#fff; --ink:#15191A; --muted:#5A6566; --line:rgba(21,25,26,.12); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --calypso:#2FC4CE; --page:#0E1212; --surface:#171D1E; --ink:#F2F5F5; --muted:#9BA7A8; --line:rgba(242,245,245,.14); } }
+  :root[data-theme="dark"] { --calypso:#2FC4CE; --page:#0E1212; --surface:#171D1E; --ink:#F2F5F5; --muted:#9BA7A8; --line:rgba(242,245,245,.14); }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif;display:flex;flex-direction:column}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:18px 20px 0;flex-wrap:wrap}
+  h1{margin:0;font:600 25px/1 Fraunces,Georgia,serif;font-variation-settings:'SOFT' 60;letter-spacing:-.01em;color:var(--calypso)}
+  .sub{color:var(--muted);font-size:13px}
+  #stage{flex:1;min-height:420px;position:relative}
+  canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+  canvas:active{cursor:grabbing}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 20px 20px}
+  .chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:99px;padding:8px 14px;font:500 13px Inter,system-ui;cursor:pointer}
+  .chip[aria-pressed="true"]{background:var(--calypso);color:#fff;border-color:var(--calypso)}
+  .hint{color:var(--muted);font-size:12px;margin-left:auto}
+</style>
+
+<header>
+  <h1>Quicksell Coin</h1>
+  <span class="sub">Il marchio come moneta — tre quarti, satinata, la Q in rilievo.</span>
+</header>
+<div id="stage"><canvas id="c"></canvas></div>
+<div class="bar">
+  <button class="chip" data-f="satin" aria-pressed="true">Satinata</button>
+  <button class="chip" data-f="polished">Lucida</button>
+  <button class="chip" data-f="matte">Opaca</button>
+  <button class="chip" id="spin" aria-pressed="true">Gira</button>
+  <span class="hint">Trascina per girarla</span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  const CALYPSO = 0x007782;
+  const canvas = document.getElementById('c'), stage = document.getElementById('stage');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.95;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
+  camera.position.set(0, 0.55, 4.4); camera.lookAt(0, 0, 0);
+
+  // --- the Q-hanger mark, drawn UPRIGHT to canvases: colour map + relief map ---
+  // The face is a flat disc that looks straight at +Z, so the texture is never
+  // mirrored or turned: the hook always trails bottom-right, as the mark is drawn.
+  function markCanvas(size, mode) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = size;
+    const g = cv.getContext('2d');
+    g.fillStyle = mode === 'color' ? '#007782' : '#000'; g.fillRect(0, 0, size, size);
+    const s = size * 0.60 / 64, ox = (size - 64 * s) / 2 - 3 * s, oy = (size - 64 * s) / 2 - 3 * s;
+    g.save(); g.translate(ox, oy); g.scale(s, s);
+    g.lineWidth = 6.5; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.strokeStyle = mode === 'color' ? 'rgba(255,255,255,.96)' : '#fff';
+    if (mode === 'bump') { g.shadowColor = '#fff'; g.shadowBlur = 5; }
+    g.beginPath(); g.arc(29, 31, 16.5, 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.moveTo(40.5, 43); g.lineTo(47.5, 50);
+    g.bezierCurveTo(51.5, 54, 57.5, 52.5, 57.5, 47.5); g.bezierCurveTo(57.5, 44, 54.5, 42.5, 52.5, 44); g.stroke();
+    g.restore();
+    if (mode === 'bump') { g.strokeStyle = '#fff'; g.lineWidth = size * 0.014; g.beginPath(); g.arc(size / 2, size / 2, size * 0.46, 0, Math.PI * 2); g.stroke(); }  // one struck rim ring
+    return cv;
+  }
+  const colorTex = new THREE.CanvasTexture(markCanvas(1024, 'color')); colorTex.encoding = THREE.sRGBEncoding; colorTex.anisotropy = 8;
+  const bumpTex = new THREE.CanvasTexture(markCanvas(1024, 'bump')); bumpTex.anisotropy = 8;
+
+  // --- a soft studio environment so the metal has something to reflect ---
+  function envCube() {
+    const faces = [];
+    for (let i = 0; i < 6; i++) {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d');
+      const grad = g.createLinearGradient(0, 0, 0, 64);
+      if (i === 2) { grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, '#cfd9da'); }
+      else if (i === 3) { grad.addColorStop(0, '#5e6c6d'); grad.addColorStop(1, '#2e3839'); }
+      else { grad.addColorStop(0, '#eef2f2'); grad.addColorStop(0.55, '#b9c5c6'); grad.addColorStop(1, '#6f7c7d'); }
+      g.fillStyle = grad; g.fillRect(0, 0, 64, 64);
+      if (i === 0) { g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(8, 12, 18, 36); }   // one softbox
+      faces.push(cv);
+    }
+    const t = new THREE.CubeTexture(faces); t.needsUpdate = true; t.encoding = THREE.sRGBEncoding; return t;
+  }
+  const env = envCube(); scene.environment = env;
+
+  // Toned so the face stays Calypso, not washed to aqua.
+  const finishes = {
+    satin:    { metalness: 0.72, roughness: 0.42, envMapIntensity: 0.55 },
+    polished: { metalness: 0.90, roughness: 0.20, envMapIntensity: 0.80 },
+    matte:    { metalness: 0.45, roughness: 0.66, envMapIntensity: 0.35 },
+  };
+  const mk = (extra) => new THREE.MeshStandardMaterial({ color: CALYPSO, envMap: env, ...finishes.satin, ...extra });
+  const face = mk({ map: colorTex, bumpMap: bumpTex, bumpScale: 0.04, color: 0xffffff });
+  const rim = mk({}), back = mk({}), bevel = mk({});
+
+  // --- the coin, built along Z so the face looks at the camera upright ---
+  const R = 1, H = 0.16;
+  const coin = new THREE.Group();
+  const side = new THREE.Mesh(new THREE.CylinderGeometry(R, R, H, 160, 1, true), rim);
+  side.rotation.x = Math.PI / 2; coin.add(side);
+  const front = new THREE.Mesh(new THREE.CircleGeometry(R - 0.01, 160), face); front.position.z = H / 2; coin.add(front);
+  const rear = new THREE.Mesh(new THREE.CircleGeometry(R - 0.01, 160), back); rear.position.z = -H / 2; rear.rotation.y = Math.PI; coin.add(rear);
+  for (const z of [H / 2, -H / 2]) { const t = new THREE.Mesh(new THREE.TorusGeometry(R - 0.03, 0.035, 24, 160), bevel); t.position.z = z; coin.add(t); }
+  // three-quarter pose: lean back a little, turn to the side; the idle motion
+  // turns it about its vertical axis (a coin turning), never the face like a wheel.
+  const pose = new THREE.Group(); pose.add(coin); scene.add(pose);
+  pose.rotation.x = -0.30;
+  let yaw = 0.55;
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8fa0a2, 0.5));
+  const key = new THREE.DirectionalLight(0xffffff, 1.15); key.position.set(2.2, 3.2, 2.6); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xdff6f7, 0.4); fill.position.set(-3, 1, 2); scene.add(fill);
+  const back2 = new THREE.DirectionalLight(0xffffff, 0.55); back2.position.set(-1.5, 2.5, -3); scene.add(back2);
+
+  let spin = true, dragging = false, lx = 0, ly = 0;
+  canvas.addEventListener('pointerdown', (e) => { dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', (e) => { if (!dragging) return; yaw += (e.clientX - lx) * 0.008; pose.rotation.x += (e.clientY - ly) * 0.006; lx = e.clientX; ly = e.clientY; });
+  const stop = () => { dragging = false; };
+  canvas.addEventListener('pointerup', stop); canvas.addEventListener('pointercancel', stop);
+  document.getElementById('spin').onclick = (e) => { spin = !spin; e.currentTarget.setAttribute('aria-pressed', String(spin)); };
+  for (const b of document.querySelectorAll('.chip[data-f]')) b.onclick = () => {
+    for (const o of document.querySelectorAll('.chip[data-f]')) o.setAttribute('aria-pressed', 'false');
+    b.setAttribute('aria-pressed', 'true');
+    for (const m of [face, rim, back, bevel]) Object.assign(m, finishes[b.dataset.f]);
+  };
+
+  function size() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+  new ResizeObserver(size).observe(stage); size();
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let t = 0;
+  (function loop() {
+    if (spin && !dragging && !reduce) { t += 0.006; yaw = 0.55 + Math.sin(t) * 0.45; }   // gentle turn, face never leaves view
+    coin.rotation.y = yaw;
+    renderer.render(scene, camera); requestAnimationFrame(loop);
+  })();
+  window.__coinPNG = () => renderer.domElement.toDataURL('image/png');
+})();
+</script>

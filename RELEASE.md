@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.21
+
+**1.4.21** — taglia: il menu si chiude appena scegli e prima lo leggevo come “fallito”, riprovavo e la toglievo; ora la chiusura conta come conferma. Marca: trovo il riquadro di ricerca come “il campo nuovo che compare” e non richiudo un menu già aperto. Foto ora su R2 (niente più limiti di caricamento).
+
 ## Quicksell 1.4.20
 
 **1.4.20** — marca: cerco davvero nel riquadro “Cerca marche” (prima scrivevo nel campo sbagliato). Taglia: la “L” compare due volte (Consigliato + griglia) e il controllo guardava quella sbagliata, de-selezionandola; sistemato. Categoria: se si ferma, manda all’app cosa ha visto a ogni livello.

@@ -213,29 +213,51 @@ async function pickInput(input, want, mode, harvestKey) {
     const all = optionEls(menu).map((o) => optLabel(o)).filter((t) => t && t.length <= 28);
     if (all.length > (HARVEST[harvestKey]?.length || 0)) HARVEST[harvestKey] = all;
   }
-  if (mode === 'brand') {
-    // The "Cerca marche" box sits OUTSIDE the list waitMenu returns, so find it
-    // by placeholder — never fall back to the field trigger (typing there does
-    // nothing). Then re-acquire the results list, which renders fresh.
-    const search = [...document.querySelectorAll('input')].find((i) => /cerca.*(march|brand)/i.test(i.placeholder || '') && i.offsetParent)
-      || menu.querySelector('input');
-    if (!search) return 'retry';
-    if (norm(search.value) !== norm(want)) { type(search, want); await sleep2(700); }
-    const fresh = [...document.querySelectorAll(menuSel)].filter((l) => l.offsetParent && optionEls(l).length);
-    if (fresh.length) menu = fresh[fresh.length - 1];
-  } else if (!optionEls(menu).some((o) => matchOpt(norm(optLabel(o)), want, mode))) {
+  if (!optionEls(menu).some((o) => matchOpt(norm(optLabel(o)), want, mode))) {
     type(input, want.split(' ')[0]);                   // type-to-filter fields
     menu = (await waitMenu(before)) || menu; await sleep2(200);
   }
   // Already selected (this or a prior tick)? Don't click — a 2nd click unchecks a box.
   if (optChosen(menu, want, mode)) { closeMenu(); return 'ok'; }
   const hit = optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), want, mode));
-  if (!hit) { closeMenu(); return 'retry'; }           // options still loading / typed brand not back yet
+  if (!hit) { closeMenu(); return 'retry'; }           // options still loading
   selectOption(hit);
-  await sleep2(250);
-  // Verify by RE-SCANNING (React replaces the node on select, so a saved `hit`
-  // ref goes stale). Retry if not registered; optChosen stops a second click.
-  const ok = optChosen(menu, want, mode) || (mode !== 'brand' && input.value.trim() && !/seleziona|scegli/i.test(input.value));
+  await sleep2(300);
+  // Success signals, any one suffices:
+  //  - a matching option now reads checked (multi-select grids like colore)
+  //  - the menu CLOSED on the click (single-select like taglia closes on pick —
+  //    the option is gone, so it can't be re-scanned; the close IS the proof)
+  //  - the field shows a real value
+  // Without the "closed" signal, size was mis-read as failed, retried, and the
+  // 2nd click un-ticked it.
+  const closed = !menu.isConnected || menu.offsetParent === null;
+  const ok = optChosen(menu, want, mode) || closed || (input.value.trim() && !/seleziona|scegli/i.test(input.value));
+  closeMenu();
+  return ok ? 'ok' : 'retry';
+}
+
+// Brand is a search flyout ("Cerca marche" box + list). Idempotent: if the box
+// is already showing (flyout open from a prior tick) don't re-click the
+// trigger — that would close it. Find the box as "a visible text input that
+// isn't one of the form's own fields", so its placeholder text doesn't matter.
+const FORM_INPUTS = new Set(['title', 'description', 'category', 'brand', 'size', 'condition', 'color', 'material', 'price', 'shoulder_width', 'height', 'photos']);
+async function pickBrand(input, brand) {
+  const findSearch = () => [...document.querySelectorAll('input')].find((i) => i !== input && i.offsetParent
+    && !FORM_INPUTS.has(i.id) && !FORM_INPUTS.has(i.name) && !/checkbox|radio|file|hidden/.test(i.type || ''));
+  let search = findSearch();
+  if (!search) { input.focus(); input.click(); await sleep2(500); search = findSearch(); }
+  if (!search) return 'retry';
+  if (norm(search.value) !== norm(brand)) { type(search, brand); await sleep2(850); }
+  const lists = [...document.querySelectorAll(menuSel)].filter((l) => l.offsetParent && optionEls(l).length);
+  const menu = lists[lists.length - 1];
+  if (!menu) return 'retry';                           // results still loading
+  if (optChosen(menu, brand, 'brand')) { closeMenu(); return 'ok'; }
+  const hit = optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), brand, 'brand'));
+  if (!hit) return 'retry';
+  selectOption(hit);
+  await sleep2(300);
+  const closed = !menu.isConnected || menu.offsetParent === null;
+  const ok = optChosen(menu, brand, 'brand') || closed || norm(input.value) === norm(brand);
   closeMenu();
   return ok ? 'ok' : 'retry';
 }
@@ -350,8 +372,8 @@ function autoFill(it) {
           if (r === 'ok' || r === 'stopped' || (j.tries = (j.tries || 0) + 1) >= 8) j.done = true;
           continue;
         }
-        const r = await pickInput(el, j.val, j.mode, j.harvest);
-        // 'ok' = clicked once (or already set) → done. 'retry' = menu/options not
+        const r = j.mode === 'brand' ? await pickBrand(el, j.val) : await pickInput(el, j.val, j.mode, j.harvest);
+        // 'ok' = selected (or already set) → done. 'retry' = menu/options not
         // ready; try a few ticks, then give up and leave it for manual.
         if (r === 'ok' || (j.tries = (j.tries || 0) + 1) >= 8) j.done = true;
       }

@@ -174,12 +174,12 @@ REGOLE:
 const PROMPT_PRICE = `Sei un esperto di pricing sul mercato dell'usato italiano (Vinted).
 
 Devi restituire:
-- est_price: il prezzo di mercato EQUO in EUR. Questo e il prezzo a cui l'articolo si vende in tempi ragionevoli. Basati sui comparabili, correggendo per marca, condizione e taglia. NON e il prezzo di pubblicazione.
-- floor_price: il prezzo MINIMO sotto il quale non ha senso vendere: in genere il 5-15 percentile dei comparabili, mai sotto 3 EUR (minimo Vinted, e sotto i 5 EUR la spedizione ammazza il margine). Per articoli di marca premium il floor resta alto: meglio invenduto che svenduto.
+- est_price: il prezzo di mercato in EUR, posizionato nella FASCIA ALTA dei comparabili: punta al 75 percentile circa dei venduti, NON alla mediana. L'articolo va valutato al massimo che il mercato sostiene realisticamente, correggendo per marca, condizione e taglia. In caso di dubbio tra due valori, scegli il piu alto. NON e il prezzo di pubblicazione.
+- floor_price: il prezzo MINIMO sotto il quale non ha senso vendere: in genere il 25-35 percentile dei comparabili (non svendere), mai sotto 3 EUR (minimo Vinted, e sotto i 5 EUR la spedizione ammazza il margine). Per articoli di marca premium il floor resta alto: meglio invenduto che svenduto.
 - reasoning: 1-2 frasi in italiano sul perche.
 
 COME PESARE I COMPARABILI:
 1. I VENDUTI sono il segnale principale. Basa est_price soprattutto su quelli.
 2. Gli ANCORA IN VENDITA sono distorti verso l'alto: quelli prezzati bene sono gia stati venduti, resta invenduto cio che costa troppo. Usali solo come tetto massimo.
-3. Il prezzo mostrato su un venduto e l'ultimo prezzo RICHIESTO, non quello incassato: su Vinted l'acquirente puo fare un'offerta privata accettata piu in basso. Scala i venduti del 5-10% per stimare l'incasso reale.
-4. Se non ci sono venduti, sii piu prudente e abbassa la stima.`;
+3. Il prezzo mostrato su un venduto e l'ultimo prezzo RICHIESTO, non quello incassato: su Vinted l'acquirente puo fare un'offerta privata accettata piu in basso. Scala i venduti solo del 3-5% per stimare l'incasso reale: non esagerare lo sconto.
+4. Se non ci sono venduti, usa gli in-vendita come riferimento e posizionati nella loro fascia medio-alta, senza abbassare per prudenza.`;

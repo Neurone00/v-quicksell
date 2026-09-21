@@ -1,371 +1,165 @@
 <title>Quicksell Coin</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,600,60&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --calypso:#007782; --page:#EDF2F2; --surface:#fff; --ink:#15191A; --muted:#5A6566; --line:rgba(21,25,26,.12); --dark:#0E1212; --darksurf:#171D1E; }
+  :root { --calypso:#007782; --page:#EDF2F2; --surface:#fff; --ink:#15191A; --muted:#5A6566; --line:rgba(21,25,26,.12); --dark:#0E1212; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --calypso:#2FC4CE; --page:#0E1212; --surface:#171D1E; --ink:#F2F5F5; --muted:#9BA7A8; --line:rgba(242,245,245,.14); } }
   :root[data-theme="dark"] { --calypso:#2FC4CE; --page:#0E1212; --surface:#171D1E; --ink:#F2F5F5; --muted:#9BA7A8; --line:rgba(242,245,245,.14); }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+  *{box-sizing:border-box} body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
   .wrap{max-width:900px;margin:0 auto;padding-block:24px 48px;padding-left:20px;padding-right:20px}
   h1{margin:0;font:600 25px/1 Fraunces,Georgia,serif;font-variation-settings:'SOFT' 60;letter-spacing:-.01em;color:var(--calypso)}
   .sub{color:var(--muted);font-size:13px;margin:6px 0 24px}
-  .hero{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .ground{border-radius:16px;display:flex;align-items:center;justify-content:center;aspect-ratio:1;max-width:100%}
-  .light{background:var(--surface);border:1px solid var(--line)}
-  .dk{background:var(--dark)}
-  .ground svg{width:78%;height:78%}
   h2{font:600 11px/1 Inter;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:28px 0 10px}
-  .sizes{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px}
-  .sz{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);font-size:12px}
-  .lock{display:flex;align-items:center;gap:10px;margin-left:auto}
-  .lock svg{width:44px;height:44px}
-  .lock b{font:600 25px/1 Fraunces,Georgia,serif;font-variation-settings:'SOFT' 60;letter-spacing:-.01em;color:var(--calypso)}
+  .hero{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .ground{border-radius:16px;display:flex;align-items:center;justify-content:center;aspect-ratio:1;max-width:100%;color:var(--calypso)}
+  .light{background:var(--surface);border:1px solid var(--line)} .dk{background:var(--dark);color:#2FC4CE}
+  .sizes{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;color:var(--calypso)}
+  .sz{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);font-size:12px} .sz svg{color:var(--calypso)}
+  .lock{display:flex;align-items:center;gap:10px;margin-left:auto} .lock b{font:600 25px/1 Fraunces,Georgia,serif;font-variation-settings:'SOFT' 60;letter-spacing:-.01em;color:var(--calypso)}
   @media (max-width:560px){.hero{grid-template-columns:1fr}}
 </style>
 <div class="wrap">
   <h1>Quicksell Coin</h1>
-  <p class="sub">Un logo 2D che legge in 3D: il marchio battuto su una moneta Calypso, inclinata verso chi guarda. La Q resta dritta.</p>
-
-  <div class="hero">
-    <div class="ground light"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" style="width:78%;height:78%">
-  <!-- Quicksell coin: the Q-hanger mark struck on a Calypso coin, tilted back
-       toward the viewer. 2D, reads as 3D. The Q stays upright (the mark is
-       never rotated); the depth comes from the perspective squash, the visible
-       thickness, the satin gradient and the emboss. Shades are tints/shades of
-       Calypso only — no new hues. -->
-  <defs>
-    <linearGradient id="qs-face" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0"   stop-color="#2A9DA7"/>
-      <stop offset="0.5" stop-color="#007782"/>
-      <stop offset="1"   stop-color="#005F69"/>
-    </linearGradient>
-    <linearGradient id="qs-edge" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#005F69"/>
-      <stop offset="1" stop-color="#003A42"/>
-    </linearGradient>
-    <radialGradient id="qs-spec" cx="0.32" cy="0.22" r="0.62">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-
-  <!-- thickness (the coin's edge, seen because it tilts back) -->
-  <ellipse cx="128" cy="146" rx="106" ry="82" fill="url(#qs-edge)"/>
-  <!-- a thin light lip where the edge meets the face -->
-  <ellipse cx="128" cy="130" rx="106" ry="82" fill="#2A9DA7" opacity="0.9"/>
-  <!-- face -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-face)"/>
-  <!-- struck rim ring: light on the upper edge, shadow on the lower -->
-  <ellipse cx="128" cy="128" rx="95" ry="73" fill="none" stroke="#ffffff" stroke-opacity="0.30" stroke-width="2.4"/>
-  <ellipse cx="129.5" cy="130" rx="95" ry="73" fill="none" stroke="#003A42" stroke-opacity="0.35" stroke-width="1.6"/>
-  <!-- specular sheen -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-spec)"/>
-
-  <!-- the mark, upright, squashed into the face's perspective -->
-  <g transform="translate(128 128) scale(1 0.78) translate(-89.25 -87.3) scale(2.55)"
-     fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <!-- emboss: dark cast below-right, then the white relief -->
-    <g stroke="#003A42" stroke-opacity="0.6" transform="translate(1.1 1.5)">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-    <g stroke="#ffffff">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-  </g>
-</svg></div>
-    <div class="ground dk"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" style="width:78%;height:78%">
-  <!-- Quicksell coin: the Q-hanger mark struck on a Calypso coin, tilted back
-       toward the viewer. 2D, reads as 3D. The Q stays upright (the mark is
-       never rotated); the depth comes from the perspective squash, the visible
-       thickness, the satin gradient and the emboss. Shades are tints/shades of
-       Calypso only — no new hues. -->
-  <defs>
-    <linearGradient id="qs-face" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0"   stop-color="#2A9DA7"/>
-      <stop offset="0.5" stop-color="#007782"/>
-      <stop offset="1"   stop-color="#005F69"/>
-    </linearGradient>
-    <linearGradient id="qs-edge" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#005F69"/>
-      <stop offset="1" stop-color="#003A42"/>
-    </linearGradient>
-    <radialGradient id="qs-spec" cx="0.32" cy="0.22" r="0.62">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-
-  <!-- thickness (the coin's edge, seen because it tilts back) -->
-  <ellipse cx="128" cy="146" rx="106" ry="82" fill="url(#qs-edge)"/>
-  <!-- a thin light lip where the edge meets the face -->
-  <ellipse cx="128" cy="130" rx="106" ry="82" fill="#2A9DA7" opacity="0.9"/>
-  <!-- face -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-face)"/>
-  <!-- struck rim ring: light on the upper edge, shadow on the lower -->
-  <ellipse cx="128" cy="128" rx="95" ry="73" fill="none" stroke="#ffffff" stroke-opacity="0.30" stroke-width="2.4"/>
-  <ellipse cx="129.5" cy="130" rx="95" ry="73" fill="none" stroke="#003A42" stroke-opacity="0.35" stroke-width="1.6"/>
-  <!-- specular sheen -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-spec)"/>
-
-  <!-- the mark, upright, squashed into the face's perspective -->
-  <g transform="translate(128 128) scale(1 0.78) translate(-89.25 -87.3) scale(2.55)"
-     fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <!-- emboss: dark cast below-right, then the white relief -->
-    <g stroke="#003A42" stroke-opacity="0.6" transform="translate(1.1 1.5)">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-    <g stroke="#ffffff">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-  </g>
-</svg></div>
-  </div>
-
+  <p class="sub">Disegnata, stile inciso: un solo tratto, niente riempimenti. Bordo zigrinato a piccoli tratti, ombra a tratteggio, la Q dritta.</p>
+  <h2>Incisa — linea</h2>
+  <div class="hero"><div class="ground light"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" style="width:78%;height:78%" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Quicksell coin, drawn / etched: one line weight, no fills. The Q-hanger
+       mark struck upright on a coin tilted back toward the viewer; the edge is
+       reeded with short strokes, the shadow is hatched. currentColor = Calypso. -->
+  <defs><clipPath id="qs-inner"><ellipse cx="128" cy="116" rx="87" ry="63"/></clipPath></defs>
+  <!-- edge: the lower arc, and the two short sides -->
+  <path d="M28 116 v22 A100 74 0 0 0 228 138 v-22" stroke-width="9"/>
+  <g stroke-width="3" opacity=".85"><line x1="38" y1="148.3" x2="38" y2="170.3"/><line x1="48" y1="160.4" x2="48" y2="182.4"/><line x1="58" y1="168.8" x2="58" y2="190.8"/><line x1="68" y1="175.2" x2="68" y2="197.2"/><line x1="78" y1="180.1" x2="78" y2="202.1"/><line x1="88" y1="183.8" x2="88" y2="205.8"/><line x1="98" y1="186.6" x2="98" y2="208.6"/><line x1="108" y1="188.5" x2="108" y2="210.5"/><line x1="118" y1="189.6" x2="118" y2="211.6"/><line x1="128" y1="190.0" x2="128" y2="212.0"/><line x1="138" y1="189.6" x2="138" y2="211.6"/><line x1="148" y1="188.5" x2="148" y2="210.5"/><line x1="158" y1="186.6" x2="158" y2="208.6"/><line x1="168" y1="183.8" x2="168" y2="205.8"/><line x1="178" y1="180.1" x2="178" y2="202.1"/><line x1="188" y1="175.2" x2="188" y2="197.2"/><line x1="198" y1="168.8" x2="198" y2="190.8"/><line x1="208" y1="160.4" x2="208" y2="182.4"/><line x1="218" y1="148.3" x2="218" y2="170.3"/></g>
+  <!-- face and struck ring -->
+  <ellipse cx="128" cy="116" rx="100" ry="74" stroke-width="9"/>
+  <ellipse cx="128" cy="116" rx="87" ry="63" stroke-width="4"/>
+  <!-- etched shadow on the face, lower right -->
+  <g clip-path="url(#qs-inner)" stroke-width="2.4" opacity=".55"><line x1="126" y1="196" x2="188" y2="134"/><line x1="137" y1="196" x2="199" y2="134"/><line x1="148" y1="196" x2="210" y2="134"/><line x1="159" y1="196" x2="221" y2="134"/><line x1="170" y1="196" x2="232" y2="134"/><line x1="181" y1="196" x2="243" y2="134"/><line x1="192" y1="196" x2="254" y2="134"/><line x1="203" y1="196" x2="265" y2="134"/></g>
+  <!-- the mark, upright, in the face's perspective -->
+  <g transform="translate(128 116) scale(1 .76) translate(-80.5 -78.8) scale(2.3)" stroke-width="6.5"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></g>
+</svg>
+</div><div class="ground dk"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" style="width:78%;height:78%" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Quicksell coin, drawn / etched: one line weight, no fills. The Q-hanger
+       mark struck upright on a coin tilted back toward the viewer; the edge is
+       reeded with short strokes, the shadow is hatched. currentColor = Calypso. -->
+  <defs><clipPath id="qs-inner"><ellipse cx="128" cy="116" rx="87" ry="63"/></clipPath></defs>
+  <!-- edge: the lower arc, and the two short sides -->
+  <path d="M28 116 v22 A100 74 0 0 0 228 138 v-22" stroke-width="9"/>
+  <g stroke-width="3" opacity=".85"><line x1="38" y1="148.3" x2="38" y2="170.3"/><line x1="48" y1="160.4" x2="48" y2="182.4"/><line x1="58" y1="168.8" x2="58" y2="190.8"/><line x1="68" y1="175.2" x2="68" y2="197.2"/><line x1="78" y1="180.1" x2="78" y2="202.1"/><line x1="88" y1="183.8" x2="88" y2="205.8"/><line x1="98" y1="186.6" x2="98" y2="208.6"/><line x1="108" y1="188.5" x2="108" y2="210.5"/><line x1="118" y1="189.6" x2="118" y2="211.6"/><line x1="128" y1="190.0" x2="128" y2="212.0"/><line x1="138" y1="189.6" x2="138" y2="211.6"/><line x1="148" y1="188.5" x2="148" y2="210.5"/><line x1="158" y1="186.6" x2="158" y2="208.6"/><line x1="168" y1="183.8" x2="168" y2="205.8"/><line x1="178" y1="180.1" x2="178" y2="202.1"/><line x1="188" y1="175.2" x2="188" y2="197.2"/><line x1="198" y1="168.8" x2="198" y2="190.8"/><line x1="208" y1="160.4" x2="208" y2="182.4"/><line x1="218" y1="148.3" x2="218" y2="170.3"/></g>
+  <!-- face and struck ring -->
+  <ellipse cx="128" cy="116" rx="100" ry="74" stroke-width="9"/>
+  <ellipse cx="128" cy="116" rx="87" ry="63" stroke-width="4"/>
+  <!-- etched shadow on the face, lower right -->
+  <g clip-path="url(#qs-inner)" stroke-width="2.4" opacity=".55"><line x1="126" y1="196" x2="188" y2="134"/><line x1="137" y1="196" x2="199" y2="134"/><line x1="148" y1="196" x2="210" y2="134"/><line x1="159" y1="196" x2="221" y2="134"/><line x1="170" y1="196" x2="232" y2="134"/><line x1="181" y1="196" x2="243" y2="134"/><line x1="192" y1="196" x2="254" y2="134"/><line x1="203" y1="196" x2="265" y2="134"/></g>
+  <!-- the mark, upright, in the face's perspective -->
+  <g transform="translate(128 116) scale(1 .76) translate(-80.5 -78.8) scale(2.3)" stroke-width="6.5"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></g>
+</svg>
+</div></div>
   <h2>Alle dimensioni reali</h2>
   <div class="sizes">
-    <div class="sz"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="128" height="128">
-  <!-- Quicksell coin: the Q-hanger mark struck on a Calypso coin, tilted back
-       toward the viewer. 2D, reads as 3D. The Q stays upright (the mark is
-       never rotated); the depth comes from the perspective squash, the visible
-       thickness, the satin gradient and the emboss. Shades are tints/shades of
-       Calypso only — no new hues. -->
-  <defs>
-    <linearGradient id="qs-face" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0"   stop-color="#2A9DA7"/>
-      <stop offset="0.5" stop-color="#007782"/>
-      <stop offset="1"   stop-color="#005F69"/>
-    </linearGradient>
-    <linearGradient id="qs-edge" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#005F69"/>
-      <stop offset="1" stop-color="#003A42"/>
-    </linearGradient>
-    <radialGradient id="qs-spec" cx="0.32" cy="0.22" r="0.62">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-
-  <!-- thickness (the coin's edge, seen because it tilts back) -->
-  <ellipse cx="128" cy="146" rx="106" ry="82" fill="url(#qs-edge)"/>
-  <!-- a thin light lip where the edge meets the face -->
-  <ellipse cx="128" cy="130" rx="106" ry="82" fill="#2A9DA7" opacity="0.9"/>
-  <!-- face -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-face)"/>
-  <!-- struck rim ring: light on the upper edge, shadow on the lower -->
-  <ellipse cx="128" cy="128" rx="95" ry="73" fill="none" stroke="#ffffff" stroke-opacity="0.30" stroke-width="2.4"/>
-  <ellipse cx="129.5" cy="130" rx="95" ry="73" fill="none" stroke="#003A42" stroke-opacity="0.35" stroke-width="1.6"/>
-  <!-- specular sheen -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-spec)"/>
-
-  <!-- the mark, upright, squashed into the face's perspective -->
-  <g transform="translate(128 128) scale(1 0.78) translate(-89.25 -87.3) scale(2.55)"
-     fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <!-- emboss: dark cast below-right, then the white relief -->
-    <g stroke="#003A42" stroke-opacity="0.6" transform="translate(1.1 1.5)">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-    <g stroke="#ffffff">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-  </g>
-</svg><span>128 · app icon</span></div>
-    <div class="sz"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="64" height="64">
-  <!-- Quicksell coin: the Q-hanger mark struck on a Calypso coin, tilted back
-       toward the viewer. 2D, reads as 3D. The Q stays upright (the mark is
-       never rotated); the depth comes from the perspective squash, the visible
-       thickness, the satin gradient and the emboss. Shades are tints/shades of
-       Calypso only — no new hues. -->
-  <defs>
-    <linearGradient id="qs-face" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0"   stop-color="#2A9DA7"/>
-      <stop offset="0.5" stop-color="#007782"/>
-      <stop offset="1"   stop-color="#005F69"/>
-    </linearGradient>
-    <linearGradient id="qs-edge" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#005F69"/>
-      <stop offset="1" stop-color="#003A42"/>
-    </linearGradient>
-    <radialGradient id="qs-spec" cx="0.32" cy="0.22" r="0.62">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-
-  <!-- thickness (the coin's edge, seen because it tilts back) -->
-  <ellipse cx="128" cy="146" rx="106" ry="82" fill="url(#qs-edge)"/>
-  <!-- a thin light lip where the edge meets the face -->
-  <ellipse cx="128" cy="130" rx="106" ry="82" fill="#2A9DA7" opacity="0.9"/>
-  <!-- face -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-face)"/>
-  <!-- struck rim ring: light on the upper edge, shadow on the lower -->
-  <ellipse cx="128" cy="128" rx="95" ry="73" fill="none" stroke="#ffffff" stroke-opacity="0.30" stroke-width="2.4"/>
-  <ellipse cx="129.5" cy="130" rx="95" ry="73" fill="none" stroke="#003A42" stroke-opacity="0.35" stroke-width="1.6"/>
-  <!-- specular sheen -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-spec)"/>
-
-  <!-- the mark, upright, squashed into the face's perspective -->
-  <g transform="translate(128 128) scale(1 0.78) translate(-89.25 -87.3) scale(2.55)"
-     fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <!-- emboss: dark cast below-right, then the white relief -->
-    <g stroke="#003A42" stroke-opacity="0.6" transform="translate(1.1 1.5)">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-    <g stroke="#ffffff">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-  </g>
-</svg><span>64</span></div>
-    <div class="sz"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="32" height="32">
-  <!-- Quicksell coin: the Q-hanger mark struck on a Calypso coin, tilted back
-       toward the viewer. 2D, reads as 3D. The Q stays upright (the mark is
-       never rotated); the depth comes from the perspective squash, the visible
-       thickness, the satin gradient and the emboss. Shades are tints/shades of
-       Calypso only — no new hues. -->
-  <defs>
-    <linearGradient id="qs-face" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0"   stop-color="#2A9DA7"/>
-      <stop offset="0.5" stop-color="#007782"/>
-      <stop offset="1"   stop-color="#005F69"/>
-    </linearGradient>
-    <linearGradient id="qs-edge" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#005F69"/>
-      <stop offset="1" stop-color="#003A42"/>
-    </linearGradient>
-    <radialGradient id="qs-spec" cx="0.32" cy="0.22" r="0.62">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-
-  <!-- thickness (the coin's edge, seen because it tilts back) -->
-  <ellipse cx="128" cy="146" rx="106" ry="82" fill="url(#qs-edge)"/>
-  <!-- a thin light lip where the edge meets the face -->
-  <ellipse cx="128" cy="130" rx="106" ry="82" fill="#2A9DA7" opacity="0.9"/>
-  <!-- face -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-face)"/>
-  <!-- struck rim ring: light on the upper edge, shadow on the lower -->
-  <ellipse cx="128" cy="128" rx="95" ry="73" fill="none" stroke="#ffffff" stroke-opacity="0.30" stroke-width="2.4"/>
-  <ellipse cx="129.5" cy="130" rx="95" ry="73" fill="none" stroke="#003A42" stroke-opacity="0.35" stroke-width="1.6"/>
-  <!-- specular sheen -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-spec)"/>
-
-  <!-- the mark, upright, squashed into the face's perspective -->
-  <g transform="translate(128 128) scale(1 0.78) translate(-89.25 -87.3) scale(2.55)"
-     fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <!-- emboss: dark cast below-right, then the white relief -->
-    <g stroke="#003A42" stroke-opacity="0.6" transform="translate(1.1 1.5)">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-    <g stroke="#ffffff">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-  </g>
-</svg><span>32 · toolbar</span></div>
-    <div class="sz"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="16" height="16">
-  <!-- Quicksell coin: the Q-hanger mark struck on a Calypso coin, tilted back
-       toward the viewer. 2D, reads as 3D. The Q stays upright (the mark is
-       never rotated); the depth comes from the perspective squash, the visible
-       thickness, the satin gradient and the emboss. Shades are tints/shades of
-       Calypso only — no new hues. -->
-  <defs>
-    <linearGradient id="qs-face" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0"   stop-color="#2A9DA7"/>
-      <stop offset="0.5" stop-color="#007782"/>
-      <stop offset="1"   stop-color="#005F69"/>
-    </linearGradient>
-    <linearGradient id="qs-edge" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#005F69"/>
-      <stop offset="1" stop-color="#003A42"/>
-    </linearGradient>
-    <radialGradient id="qs-spec" cx="0.32" cy="0.22" r="0.62">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-
-  <!-- thickness (the coin's edge, seen because it tilts back) -->
-  <ellipse cx="128" cy="146" rx="106" ry="82" fill="url(#qs-edge)"/>
-  <!-- a thin light lip where the edge meets the face -->
-  <ellipse cx="128" cy="130" rx="106" ry="82" fill="#2A9DA7" opacity="0.9"/>
-  <!-- face -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-face)"/>
-  <!-- struck rim ring: light on the upper edge, shadow on the lower -->
-  <ellipse cx="128" cy="128" rx="95" ry="73" fill="none" stroke="#ffffff" stroke-opacity="0.30" stroke-width="2.4"/>
-  <ellipse cx="129.5" cy="130" rx="95" ry="73" fill="none" stroke="#003A42" stroke-opacity="0.35" stroke-width="1.6"/>
-  <!-- specular sheen -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-spec)"/>
-
-  <!-- the mark, upright, squashed into the face's perspective -->
-  <g transform="translate(128 128) scale(1 0.78) translate(-89.25 -87.3) scale(2.55)"
-     fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <!-- emboss: dark cast below-right, then the white relief -->
-    <g stroke="#003A42" stroke-opacity="0.6" transform="translate(1.1 1.5)">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-    <g stroke="#ffffff">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-  </g>
-</svg><span>16 · favicon</span></div>
-    <div class="lock"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="44" height="44">
-  <!-- Quicksell coin: the Q-hanger mark struck on a Calypso coin, tilted back
-       toward the viewer. 2D, reads as 3D. The Q stays upright (the mark is
-       never rotated); the depth comes from the perspective squash, the visible
-       thickness, the satin gradient and the emboss. Shades are tints/shades of
-       Calypso only — no new hues. -->
-  <defs>
-    <linearGradient id="qs-face" x1="0.15" y1="0" x2="0.85" y2="1">
-      <stop offset="0"   stop-color="#2A9DA7"/>
-      <stop offset="0.5" stop-color="#007782"/>
-      <stop offset="1"   stop-color="#005F69"/>
-    </linearGradient>
-    <linearGradient id="qs-edge" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#005F69"/>
-      <stop offset="1" stop-color="#003A42"/>
-    </linearGradient>
-    <radialGradient id="qs-spec" cx="0.32" cy="0.22" r="0.62">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0.5"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-
-  <!-- thickness (the coin's edge, seen because it tilts back) -->
-  <ellipse cx="128" cy="146" rx="106" ry="82" fill="url(#qs-edge)"/>
-  <!-- a thin light lip where the edge meets the face -->
-  <ellipse cx="128" cy="130" rx="106" ry="82" fill="#2A9DA7" opacity="0.9"/>
-  <!-- face -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-face)"/>
-  <!-- struck rim ring: light on the upper edge, shadow on the lower -->
-  <ellipse cx="128" cy="128" rx="95" ry="73" fill="none" stroke="#ffffff" stroke-opacity="0.30" stroke-width="2.4"/>
-  <ellipse cx="129.5" cy="130" rx="95" ry="73" fill="none" stroke="#003A42" stroke-opacity="0.35" stroke-width="1.6"/>
-  <!-- specular sheen -->
-  <ellipse cx="128" cy="128" rx="106" ry="82" fill="url(#qs-spec)"/>
-
-  <!-- the mark, upright, squashed into the face's perspective -->
-  <g transform="translate(128 128) scale(1 0.78) translate(-89.25 -87.3) scale(2.55)"
-     fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <!-- emboss: dark cast below-right, then the white relief -->
-    <g stroke="#003A42" stroke-opacity="0.6" transform="translate(1.1 1.5)">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-    <g stroke="#ffffff">
-      <circle cx="29" cy="31" r="16.5"/>
-      <path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/>
-    </g>
-  </g>
-</svg><b>Quicksell</b></div>
+    <div class="sz"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="128" height="128" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Quicksell coin, drawn / etched: one line weight, no fills. The Q-hanger
+       mark struck upright on a coin tilted back toward the viewer; the edge is
+       reeded with short strokes, the shadow is hatched. currentColor = Calypso. -->
+  <defs><clipPath id="qs-inner"><ellipse cx="128" cy="116" rx="87" ry="63"/></clipPath></defs>
+  <!-- edge: the lower arc, and the two short sides -->
+  <path d="M28 116 v22 A100 74 0 0 0 228 138 v-22" stroke-width="9"/>
+  <g stroke-width="3" opacity=".85"><line x1="38" y1="148.3" x2="38" y2="170.3"/><line x1="48" y1="160.4" x2="48" y2="182.4"/><line x1="58" y1="168.8" x2="58" y2="190.8"/><line x1="68" y1="175.2" x2="68" y2="197.2"/><line x1="78" y1="180.1" x2="78" y2="202.1"/><line x1="88" y1="183.8" x2="88" y2="205.8"/><line x1="98" y1="186.6" x2="98" y2="208.6"/><line x1="108" y1="188.5" x2="108" y2="210.5"/><line x1="118" y1="189.6" x2="118" y2="211.6"/><line x1="128" y1="190.0" x2="128" y2="212.0"/><line x1="138" y1="189.6" x2="138" y2="211.6"/><line x1="148" y1="188.5" x2="148" y2="210.5"/><line x1="158" y1="186.6" x2="158" y2="208.6"/><line x1="168" y1="183.8" x2="168" y2="205.8"/><line x1="178" y1="180.1" x2="178" y2="202.1"/><line x1="188" y1="175.2" x2="188" y2="197.2"/><line x1="198" y1="168.8" x2="198" y2="190.8"/><line x1="208" y1="160.4" x2="208" y2="182.4"/><line x1="218" y1="148.3" x2="218" y2="170.3"/></g>
+  <!-- face and struck ring -->
+  <ellipse cx="128" cy="116" rx="100" ry="74" stroke-width="9"/>
+  <ellipse cx="128" cy="116" rx="87" ry="63" stroke-width="4"/>
+  <!-- etched shadow on the face, lower right -->
+  <g clip-path="url(#qs-inner)" stroke-width="2.4" opacity=".55"><line x1="126" y1="196" x2="188" y2="134"/><line x1="137" y1="196" x2="199" y2="134"/><line x1="148" y1="196" x2="210" y2="134"/><line x1="159" y1="196" x2="221" y2="134"/><line x1="170" y1="196" x2="232" y2="134"/><line x1="181" y1="196" x2="243" y2="134"/><line x1="192" y1="196" x2="254" y2="134"/><line x1="203" y1="196" x2="265" y2="134"/></g>
+  <!-- the mark, upright, in the face's perspective -->
+  <g transform="translate(128 116) scale(1 .76) translate(-80.5 -78.8) scale(2.3)" stroke-width="6.5"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></g>
+</svg>
+<span>128 · app icon</span></div>
+    <div class="sz"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="64" height="64" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Quicksell coin, drawn / etched: one line weight, no fills. The Q-hanger
+       mark struck upright on a coin tilted back toward the viewer; the edge is
+       reeded with short strokes, the shadow is hatched. currentColor = Calypso. -->
+  <defs><clipPath id="qs-inner"><ellipse cx="128" cy="116" rx="87" ry="63"/></clipPath></defs>
+  <!-- edge: the lower arc, and the two short sides -->
+  <path d="M28 116 v22 A100 74 0 0 0 228 138 v-22" stroke-width="9"/>
+  <g stroke-width="3" opacity=".85"><line x1="38" y1="148.3" x2="38" y2="170.3"/><line x1="48" y1="160.4" x2="48" y2="182.4"/><line x1="58" y1="168.8" x2="58" y2="190.8"/><line x1="68" y1="175.2" x2="68" y2="197.2"/><line x1="78" y1="180.1" x2="78" y2="202.1"/><line x1="88" y1="183.8" x2="88" y2="205.8"/><line x1="98" y1="186.6" x2="98" y2="208.6"/><line x1="108" y1="188.5" x2="108" y2="210.5"/><line x1="118" y1="189.6" x2="118" y2="211.6"/><line x1="128" y1="190.0" x2="128" y2="212.0"/><line x1="138" y1="189.6" x2="138" y2="211.6"/><line x1="148" y1="188.5" x2="148" y2="210.5"/><line x1="158" y1="186.6" x2="158" y2="208.6"/><line x1="168" y1="183.8" x2="168" y2="205.8"/><line x1="178" y1="180.1" x2="178" y2="202.1"/><line x1="188" y1="175.2" x2="188" y2="197.2"/><line x1="198" y1="168.8" x2="198" y2="190.8"/><line x1="208" y1="160.4" x2="208" y2="182.4"/><line x1="218" y1="148.3" x2="218" y2="170.3"/></g>
+  <!-- face and struck ring -->
+  <ellipse cx="128" cy="116" rx="100" ry="74" stroke-width="9"/>
+  <ellipse cx="128" cy="116" rx="87" ry="63" stroke-width="4"/>
+  <!-- etched shadow on the face, lower right -->
+  <g clip-path="url(#qs-inner)" stroke-width="2.4" opacity=".55"><line x1="126" y1="196" x2="188" y2="134"/><line x1="137" y1="196" x2="199" y2="134"/><line x1="148" y1="196" x2="210" y2="134"/><line x1="159" y1="196" x2="221" y2="134"/><line x1="170" y1="196" x2="232" y2="134"/><line x1="181" y1="196" x2="243" y2="134"/><line x1="192" y1="196" x2="254" y2="134"/><line x1="203" y1="196" x2="265" y2="134"/></g>
+  <!-- the mark, upright, in the face's perspective -->
+  <g transform="translate(128 116) scale(1 .76) translate(-80.5 -78.8) scale(2.3)" stroke-width="6.5"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></g>
+</svg>
+<span>64</span></div>
+    <div class="sz"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="32" height="32" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Quicksell coin, drawn / etched: one line weight, no fills. The Q-hanger
+       mark struck upright on a coin tilted back toward the viewer; the edge is
+       reeded with short strokes, the shadow is hatched. currentColor = Calypso. -->
+  <defs><clipPath id="qs-inner"><ellipse cx="128" cy="116" rx="87" ry="63"/></clipPath></defs>
+  <!-- edge: the lower arc, and the two short sides -->
+  <path d="M28 116 v22 A100 74 0 0 0 228 138 v-22" stroke-width="9"/>
+  <g stroke-width="3" opacity=".85"><line x1="38" y1="148.3" x2="38" y2="170.3"/><line x1="48" y1="160.4" x2="48" y2="182.4"/><line x1="58" y1="168.8" x2="58" y2="190.8"/><line x1="68" y1="175.2" x2="68" y2="197.2"/><line x1="78" y1="180.1" x2="78" y2="202.1"/><line x1="88" y1="183.8" x2="88" y2="205.8"/><line x1="98" y1="186.6" x2="98" y2="208.6"/><line x1="108" y1="188.5" x2="108" y2="210.5"/><line x1="118" y1="189.6" x2="118" y2="211.6"/><line x1="128" y1="190.0" x2="128" y2="212.0"/><line x1="138" y1="189.6" x2="138" y2="211.6"/><line x1="148" y1="188.5" x2="148" y2="210.5"/><line x1="158" y1="186.6" x2="158" y2="208.6"/><line x1="168" y1="183.8" x2="168" y2="205.8"/><line x1="178" y1="180.1" x2="178" y2="202.1"/><line x1="188" y1="175.2" x2="188" y2="197.2"/><line x1="198" y1="168.8" x2="198" y2="190.8"/><line x1="208" y1="160.4" x2="208" y2="182.4"/><line x1="218" y1="148.3" x2="218" y2="170.3"/></g>
+  <!-- face and struck ring -->
+  <ellipse cx="128" cy="116" rx="100" ry="74" stroke-width="9"/>
+  <ellipse cx="128" cy="116" rx="87" ry="63" stroke-width="4"/>
+  <!-- etched shadow on the face, lower right -->
+  <g clip-path="url(#qs-inner)" stroke-width="2.4" opacity=".55"><line x1="126" y1="196" x2="188" y2="134"/><line x1="137" y1="196" x2="199" y2="134"/><line x1="148" y1="196" x2="210" y2="134"/><line x1="159" y1="196" x2="221" y2="134"/><line x1="170" y1="196" x2="232" y2="134"/><line x1="181" y1="196" x2="243" y2="134"/><line x1="192" y1="196" x2="254" y2="134"/><line x1="203" y1="196" x2="265" y2="134"/></g>
+  <!-- the mark, upright, in the face's perspective -->
+  <g transform="translate(128 116) scale(1 .76) translate(-80.5 -78.8) scale(2.3)" stroke-width="6.5"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></g>
+</svg>
+<span>32 · toolbar</span></div>
+    <div class="sz"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="16" height="16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Quicksell coin, drawn / etched: one line weight, no fills. The Q-hanger
+       mark struck upright on a coin tilted back toward the viewer; the edge is
+       reeded with short strokes, the shadow is hatched. currentColor = Calypso. -->
+  <defs><clipPath id="qs-inner"><ellipse cx="128" cy="116" rx="87" ry="63"/></clipPath></defs>
+  <!-- edge: the lower arc, and the two short sides -->
+  <path d="M28 116 v22 A100 74 0 0 0 228 138 v-22" stroke-width="9"/>
+  <g stroke-width="3" opacity=".85"><line x1="38" y1="148.3" x2="38" y2="170.3"/><line x1="48" y1="160.4" x2="48" y2="182.4"/><line x1="58" y1="168.8" x2="58" y2="190.8"/><line x1="68" y1="175.2" x2="68" y2="197.2"/><line x1="78" y1="180.1" x2="78" y2="202.1"/><line x1="88" y1="183.8" x2="88" y2="205.8"/><line x1="98" y1="186.6" x2="98" y2="208.6"/><line x1="108" y1="188.5" x2="108" y2="210.5"/><line x1="118" y1="189.6" x2="118" y2="211.6"/><line x1="128" y1="190.0" x2="128" y2="212.0"/><line x1="138" y1="189.6" x2="138" y2="211.6"/><line x1="148" y1="188.5" x2="148" y2="210.5"/><line x1="158" y1="186.6" x2="158" y2="208.6"/><line x1="168" y1="183.8" x2="168" y2="205.8"/><line x1="178" y1="180.1" x2="178" y2="202.1"/><line x1="188" y1="175.2" x2="188" y2="197.2"/><line x1="198" y1="168.8" x2="198" y2="190.8"/><line x1="208" y1="160.4" x2="208" y2="182.4"/><line x1="218" y1="148.3" x2="218" y2="170.3"/></g>
+  <!-- face and struck ring -->
+  <ellipse cx="128" cy="116" rx="100" ry="74" stroke-width="9"/>
+  <ellipse cx="128" cy="116" rx="87" ry="63" stroke-width="4"/>
+  <!-- etched shadow on the face, lower right -->
+  <g clip-path="url(#qs-inner)" stroke-width="2.4" opacity=".55"><line x1="126" y1="196" x2="188" y2="134"/><line x1="137" y1="196" x2="199" y2="134"/><line x1="148" y1="196" x2="210" y2="134"/><line x1="159" y1="196" x2="221" y2="134"/><line x1="170" y1="196" x2="232" y2="134"/><line x1="181" y1="196" x2="243" y2="134"/><line x1="192" y1="196" x2="254" y2="134"/><line x1="203" y1="196" x2="265" y2="134"/></g>
+  <!-- the mark, upright, in the face's perspective -->
+  <g transform="translate(128 116) scale(1 .76) translate(-80.5 -78.8) scale(2.3)" stroke-width="6.5"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></g>
+</svg>
+<span>16 · favicon</span></div>
+    <div class="lock"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="44" height="44" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Quicksell coin, drawn / etched: one line weight, no fills. The Q-hanger
+       mark struck upright on a coin tilted back toward the viewer; the edge is
+       reeded with short strokes, the shadow is hatched. currentColor = Calypso. -->
+  <defs><clipPath id="qs-inner"><ellipse cx="128" cy="116" rx="87" ry="63"/></clipPath></defs>
+  <!-- edge: the lower arc, and the two short sides -->
+  <path d="M28 116 v22 A100 74 0 0 0 228 138 v-22" stroke-width="9"/>
+  <g stroke-width="3" opacity=".85"><line x1="38" y1="148.3" x2="38" y2="170.3"/><line x1="48" y1="160.4" x2="48" y2="182.4"/><line x1="58" y1="168.8" x2="58" y2="190.8"/><line x1="68" y1="175.2" x2="68" y2="197.2"/><line x1="78" y1="180.1" x2="78" y2="202.1"/><line x1="88" y1="183.8" x2="88" y2="205.8"/><line x1="98" y1="186.6" x2="98" y2="208.6"/><line x1="108" y1="188.5" x2="108" y2="210.5"/><line x1="118" y1="189.6" x2="118" y2="211.6"/><line x1="128" y1="190.0" x2="128" y2="212.0"/><line x1="138" y1="189.6" x2="138" y2="211.6"/><line x1="148" y1="188.5" x2="148" y2="210.5"/><line x1="158" y1="186.6" x2="158" y2="208.6"/><line x1="168" y1="183.8" x2="168" y2="205.8"/><line x1="178" y1="180.1" x2="178" y2="202.1"/><line x1="188" y1="175.2" x2="188" y2="197.2"/><line x1="198" y1="168.8" x2="198" y2="190.8"/><line x1="208" y1="160.4" x2="208" y2="182.4"/><line x1="218" y1="148.3" x2="218" y2="170.3"/></g>
+  <!-- face and struck ring -->
+  <ellipse cx="128" cy="116" rx="100" ry="74" stroke-width="9"/>
+  <ellipse cx="128" cy="116" rx="87" ry="63" stroke-width="4"/>
+  <!-- etched shadow on the face, lower right -->
+  <g clip-path="url(#qs-inner)" stroke-width="2.4" opacity=".55"><line x1="126" y1="196" x2="188" y2="134"/><line x1="137" y1="196" x2="199" y2="134"/><line x1="148" y1="196" x2="210" y2="134"/><line x1="159" y1="196" x2="221" y2="134"/><line x1="170" y1="196" x2="232" y2="134"/><line x1="181" y1="196" x2="243" y2="134"/><line x1="192" y1="196" x2="254" y2="134"/><line x1="203" y1="196" x2="265" y2="134"/></g>
+  <!-- the mark, upright, in the face's perspective -->
+  <g transform="translate(128 116) scale(1 .76) translate(-80.5 -78.8) scale(2.3)" stroke-width="6.5"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></g>
+</svg>
+<b>Quicksell</b></div>
   </div>
+  <h2>Variante — timbro pieno (un colore, disegno in bianco)</h2>
+  <div class="hero"><div class="ground light"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" style="width:78%;height:78%" stroke-linecap="round" stroke-linejoin="round">
+  <defs><clipPath id="qs-inner2"><ellipse cx="128" cy="116" rx="87" ry="63"/></clipPath></defs>
+  <path d="M28 116 v22 A100 74 0 0 0 228 138 v-22Z" fill="#007782"/>
+  <g stroke="#fff" stroke-width="3" opacity=".55" fill="none"><line x1="38" y1="148.3" x2="38" y2="170.3"/><line x1="48" y1="160.4" x2="48" y2="182.4"/><line x1="58" y1="168.8" x2="58" y2="190.8"/><line x1="68" y1="175.2" x2="68" y2="197.2"/><line x1="78" y1="180.1" x2="78" y2="202.1"/><line x1="88" y1="183.8" x2="88" y2="205.8"/><line x1="98" y1="186.6" x2="98" y2="208.6"/><line x1="108" y1="188.5" x2="108" y2="210.5"/><line x1="118" y1="189.6" x2="118" y2="211.6"/><line x1="128" y1="190.0" x2="128" y2="212.0"/><line x1="138" y1="189.6" x2="138" y2="211.6"/><line x1="148" y1="188.5" x2="148" y2="210.5"/><line x1="158" y1="186.6" x2="158" y2="208.6"/><line x1="168" y1="183.8" x2="168" y2="205.8"/><line x1="178" y1="180.1" x2="178" y2="202.1"/><line x1="188" y1="175.2" x2="188" y2="197.2"/><line x1="198" y1="168.8" x2="198" y2="190.8"/><line x1="208" y1="160.4" x2="208" y2="182.4"/><line x1="218" y1="148.3" x2="218" y2="170.3"/></g>
+  <ellipse cx="128" cy="116" rx="100" ry="74" fill="#007782"/>
+  <ellipse cx="128" cy="116" rx="87" ry="63" fill="none" stroke="#fff" stroke-width="4" opacity=".6"/>
+  <g clip-path="url(#qs-inner2)" stroke="#fff" stroke-width="2.4" opacity=".28" fill="none"><line x1="126" y1="196" x2="188" y2="134"/><line x1="137" y1="196" x2="199" y2="134"/><line x1="148" y1="196" x2="210" y2="134"/><line x1="159" y1="196" x2="221" y2="134"/><line x1="170" y1="196" x2="232" y2="134"/><line x1="181" y1="196" x2="243" y2="134"/><line x1="192" y1="196" x2="254" y2="134"/><line x1="203" y1="196" x2="265" y2="134"/></g>
+  <g transform="translate(128 116) scale(1 .76) translate(-80.5 -78.8) scale(2.3)" fill="none" stroke="#fff" stroke-width="6.5"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></g>
+</svg>
+</div><div class="ground dk"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" style="width:78%;height:78%" stroke-linecap="round" stroke-linejoin="round">
+  <defs><clipPath id="qs-inner2"><ellipse cx="128" cy="116" rx="87" ry="63"/></clipPath></defs>
+  <path d="M28 116 v22 A100 74 0 0 0 228 138 v-22Z" fill="#007782"/>
+  <g stroke="#fff" stroke-width="3" opacity=".55" fill="none"><line x1="38" y1="148.3" x2="38" y2="170.3"/><line x1="48" y1="160.4" x2="48" y2="182.4"/><line x1="58" y1="168.8" x2="58" y2="190.8"/><line x1="68" y1="175.2" x2="68" y2="197.2"/><line x1="78" y1="180.1" x2="78" y2="202.1"/><line x1="88" y1="183.8" x2="88" y2="205.8"/><line x1="98" y1="186.6" x2="98" y2="208.6"/><line x1="108" y1="188.5" x2="108" y2="210.5"/><line x1="118" y1="189.6" x2="118" y2="211.6"/><line x1="128" y1="190.0" x2="128" y2="212.0"/><line x1="138" y1="189.6" x2="138" y2="211.6"/><line x1="148" y1="188.5" x2="148" y2="210.5"/><line x1="158" y1="186.6" x2="158" y2="208.6"/><line x1="168" y1="183.8" x2="168" y2="205.8"/><line x1="178" y1="180.1" x2="178" y2="202.1"/><line x1="188" y1="175.2" x2="188" y2="197.2"/><line x1="198" y1="168.8" x2="198" y2="190.8"/><line x1="208" y1="160.4" x2="208" y2="182.4"/><line x1="218" y1="148.3" x2="218" y2="170.3"/></g>
+  <ellipse cx="128" cy="116" rx="100" ry="74" fill="#007782"/>
+  <ellipse cx="128" cy="116" rx="87" ry="63" fill="none" stroke="#fff" stroke-width="4" opacity=".6"/>
+  <g clip-path="url(#qs-inner2)" stroke="#fff" stroke-width="2.4" opacity=".28" fill="none"><line x1="126" y1="196" x2="188" y2="134"/><line x1="137" y1="196" x2="199" y2="134"/><line x1="148" y1="196" x2="210" y2="134"/><line x1="159" y1="196" x2="221" y2="134"/><line x1="170" y1="196" x2="232" y2="134"/><line x1="181" y1="196" x2="243" y2="134"/><line x1="192" y1="196" x2="254" y2="134"/><line x1="203" y1="196" x2="265" y2="134"/></g>
+  <g transform="translate(128 116) scale(1 .76) translate(-80.5 -78.8) scale(2.3)" fill="none" stroke="#fff" stroke-width="6.5"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></g>
+</svg>
+</div></div>
 </div>

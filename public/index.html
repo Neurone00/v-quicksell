@@ -197,12 +197,23 @@ let items = [], CFG = {}, showSetup = false, uploading = 0, draining = false;
 const LABEL = { queued:'In coda', analyzing:'Analisi', needs_input:'Serve conferma', pending:'Da approvare',
   ready:'Pronto da pubblicare', live:'Online', sold:'Venduto', error:'Errore' };
 
+let lastSig = '';
 async function refresh() {
   const [st, d] = await Promise.all([api('/status'), api('/items')]);
   if (st.error === 'unauthorized') return locked();
-  CFG = st; $('#ver').textContent = 'v' + st.version;
+  CFG = st; items = d.items || [];
+  // Only touch the DOM when something actually changed — otherwise the 6s poll
+  // rebuilds the list (and reloads its images) on every tick, causing a blink.
+  const sig = JSON.stringify([st.version, st.push, st.email, st.mail_ready, st.user, st.ai, st.apk_version, st.counts, showSetup,
+    items.map((i) => [i.id, i.status, i.title, i.brand, i.size, i.list_price, i.current_price, i.due_price, i.floor_price, (i.needs || []).length, (i.photos || []).length])]);
+  if (sig === lastSig) return;
+  // If you're typing in a card, don't rebuild the list under you — wait until
+  // you're done (lastSig stays stale, so the next poll re-renders then).
+  const ae = document.activeElement;
+  if (ae && $('#list').contains(ae) && /^(INPUT|TEXTAREA)$/.test(ae.tagName)) return;
+  lastSig = sig;
+  $('#ver').textContent = 'v' + st.version;
   renderSetup(st); apkBanner(st);
-  items = d.items || [];
   render(!!document.querySelector('.onb'));
   mountAnims();
 }

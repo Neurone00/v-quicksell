@@ -243,6 +243,10 @@ async function route(p, req, env, ctx, url, user) {
       vapid_public: env.VAPID_PUBLIC,
       email: await env.KV.get(`emailof:${user}`),
       mail_ready: !!env.RESEND_API_KEY,
+      fill_failures: await (async () => {   // last two days
+        const d = (o) => new Date(Date.now() - o * 864e5).toISOString().slice(0, 10);
+        return Number((await env.KV.get(`fill_fail:${user}:${d(0)}`)) || 0) + Number((await env.KV.get(`fill_fail:${user}:${d(1)}`)) || 0);
+      })(),
       counts: Object.fromEntries((counts.results || []).map((r) => [r.status, r.n])),
     });
   }
@@ -312,6 +316,14 @@ async function route(p, req, env, ctx, url, user) {
     const body = await req.json();
     const prev = JSON.parse((await env.KV.get('learned')) || '[]');
     await env.KV.put('learned', JSON.stringify([...prev, { at: new Date().toISOString(), ...body }].slice(-10)));
+    // Count filler failures per day so the popup can say "Vinted may have
+    // changed" once they pile up (a probe = a field the filler gave up on;
+    // a heal that didn't set the field counts too).
+    const failed = ['sizeProbe', 'brandProbe', 'categoryTrace', 'dropdownProbe'].some((k) => k in body) || (body.healed && body.healed.ok === false);
+    if (failed) {
+      const day = new Date().toISOString().slice(0, 10), fk = `fill_fail:${user}:${day}`;
+      await env.KV.put(fk, String(Number((await env.KV.get(fk)) || 0) + 1), { expirationTtl: 172800 });
+    }
     return json({ ok: true });
   }
   // Self-heal: the extension sends the open flyout's accessibility snapshot and

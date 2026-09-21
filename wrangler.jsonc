@@ -30,7 +30,7 @@
     "BUMP_PCT": 50,
     "DROP_PCT": 5,
     "DROP_EVERY_DAYS": 3,
-    "APP_VERSION": "1.4.24",
+    "APP_VERSION": "1.5.1",
     "APK_VERSION": "1.0.0",
     "PUBLIC_URL": "https://v-quicksell.neurone00.workers.dev",
     "MAIL_FROM": "Quicksell <quicksell@moskitodesign.it>",

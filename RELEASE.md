@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.5.1
+
+**1.5.1** — se il compilatore fatica più volte (segno che Vinted ha cambiato qualcosa), il pannello te lo dice.
+
 ## Quicksell 1.5.0
 
 **1.5.0 — a prova di cambiamenti di Vinted.** L’estensione non dipende più dai nomi di classe di Vinted (quelli che cambiano a ogni aggiornamento): trova i campi per ruolo e nome, come farebbe una persona. E se un campo comunque non si compila, chiede al modello di guardare il menu aperto e dire cosa cliccare (auto-riparazione), poi lo segnala.

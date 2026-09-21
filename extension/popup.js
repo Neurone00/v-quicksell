@@ -19,7 +19,13 @@ async function connection() {
   const r = await send({ type: 'api', path: '/api/status', method: 'GET' });
   if (r.ok) {
     $('#accStatus').innerHTML = `<small>Account attivo: <b>${esc(r.data.user)}</b>.</small>`;
-    $('#conn').innerHTML = '';
+    // Filler failures piling up = Vinted probably changed its form. The
+    // extension self-heals per field; this just tells you it's happening.
+    const n = r.data.fill_failures || 0;
+    $('#conn').innerHTML = n >= 3
+      ? `<div class="card upd"><b>Vinted potrebbe aver cambiato il modulo</b><br>
+         <small>Il compilatore ha faticato ${n} volte negli ultimi due giorni. Si ripara da solo campo per campo; se qualcosa resta vuoto, dimmelo.</small></div>`
+      : '';
     connectPhone();
     return true;
   }

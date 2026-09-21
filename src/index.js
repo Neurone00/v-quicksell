@@ -3,9 +3,19 @@ import { analysePhotos, priceFromComparables } from './ai.js';
 import { notify } from './push.js';
 import { listPrice, nextPrice, round9 } from './price.js';
 
-// ponytail: photos live in KV, not R2. R2 needs a card on file just to enable;
-// KV is already bound, free, and 1GB holds far more than this app will store.
+// Photos: R2 when the PHOTOS bucket is bound (right store for images, and off
+// KV's ~1000/day free write quota that stalls uploads); KV otherwise.
 const PHOTO = 'photo:';
+
+// Photos live in R2 when the bucket is bound (images belong there, and it keeps
+// them off KV's small daily write quota). Falls back to KV so nothing breaks
+// before R2 is activated; reads try R2 then KV so old KV photos still serve.
+const photoPut = (env, key, data) => (env.PHOTOS ? env.PHOTOS.put(key, data) : env.KV.put(PHOTO + key, data));
+const photoDel = (env, key) => (env.PHOTOS ? env.PHOTOS.delete(key) : env.KV.delete(PHOTO + key));
+async function photoGet(env, key) {
+  if (env.PHOTOS) { const o = await env.PHOTOS.get(key); if (o) return o.arrayBuffer(); }
+  return env.KV.get(PHOTO + key, 'arrayBuffer');
+}
 
 const json = (o, status = 200) =>
   new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
@@ -122,7 +132,7 @@ export default {
         .bind(user, `%"${key}"%`).first());
       const ok = mine || url.searchParams.get('t') === (await photoToken(env, key));
       if (!ok) return new Response('no', { status: 403 });
-      const buf = await env.KV.get(PHOTO + key, 'arrayBuffer');
+      const buf = await photoGet(env, key);
       if (!buf) return new Response('not found', { status: 404 });
       return new Response(buf, { headers: { 'content-type': 'image/jpeg', 'cache-control': 'private, max-age=3600' } });
     }
@@ -262,8 +272,8 @@ async function route(p, req, env, ctx, url, user) {
     if (files.length) {
       const keys = [];
       for (const [i, f] of files.entries()) {
-        const key = `${Date.now()}-${i}.jpg`;
-        await env.KV.put(PHOTO + key, await processPhoto(env, f));
+        const key = `${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}.jpg`;  // collision-proof
+        await photoPut(env, key, await processPhoto(env, f));
         keys.push(key);
       }
       ({ id } = await db.prepare("INSERT INTO items (status, photos, user_id) VALUES ('queued', ?, ?) RETURNING id")
@@ -389,7 +399,7 @@ async function route(p, req, env, ctx, url, user) {
     }
     if (m[2] === 'reject') {
       const it = await db.prepare('SELECT photos FROM items WHERE id=?').bind(id).first();
-      for (const k of JSON.parse(it?.photos || '[]')) await env.KV.delete(PHOTO + k);   // free the storage
+      for (const k of JSON.parse(it?.photos || '[]')) await photoDel(env, k);   // free the storage
       await db.prepare("UPDATE items SET status='archived', photos='[]' WHERE id=?").bind(id).run();
       return json({ ok: true });
     }
@@ -441,7 +451,7 @@ async function analyse(env, id) {
     const item = await db.prepare('SELECT * FROM items WHERE id=?').bind(id).first();
     const b64 = [];
     for (const k of JSON.parse(item.photos).slice(0, 4)) {
-      const buf = await env.KV.get(PHOTO + k, 'arrayBuffer');
+      const buf = await photoGet(env, k);
       if (buf) b64.push(bufToB64(buf));
     }
     const enums = JSON.parse((await env.KV.get('vinted_enums')) || '{}');

@@ -10,7 +10,7 @@
   <ellipse cx="128" cy="116" rx="100" ry="74" stroke-width="9"/>
   <ellipse cx="128" cy="116" rx="87" ry="63" stroke-width="4"/>
   <!-- etched shadow on the face, lower right -->
-  <g clip-path="url(#qs-inner)" stroke-width="2.4" opacity=".55"><line x1="126" y1="196" x2="188" y2="134"/><line x1="137" y1="196" x2="199" y2="134"/><line x1="148" y1="196" x2="210" y2="134"/><line x1="159" y1="196" x2="221" y2="134"/><line x1="170" y1="196" x2="232" y2="134"/><line x1="181" y1="196" x2="243" y2="134"/><line x1="192" y1="196" x2="254" y2="134"/><line x1="203" y1="196" x2="265" y2="134"/></g>
+  <g clip-path="url(#qs-inner)" stroke-width="2.4" opacity=".55"><line x1="170" y1="196" x2="232" y2="134"/><line x1="181" y1="196" x2="243" y2="134"/><line x1="192" y1="196" x2="254" y2="134"/><line x1="203" y1="196" x2="265" y2="134"/></g>
   <!-- the mark, upright, in the face's perspective -->
   <g transform="translate(128 116) scale(1 .76) translate(-80.5 -78.8) scale(2.3)" stroke-width="6.5"><circle cx="29" cy="31" r="16.5"/><path d="M40.5 43 L47.5 50 C 51.5 54, 57.5 52.5, 57.5 47.5 C 57.5 44, 54.5 42.5, 52.5 44"/></g>
 </svg>

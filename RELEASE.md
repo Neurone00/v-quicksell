@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.23
+
+**1.4.23** — taglia: uso esattamente il click che funziona (verificato sul pulsante della griglia) e controllo il valore del campo, non lo stato del pulsante che non si aggiorna.
+
 ## Quicksell 1.4.22
 
 **1.4.22** — taglia: clicco il pulsante della griglia (non il doppione “Consigliato”), con tasto Spazio di riserva se il click non prende; se ancora non va, manda all’app cosa è successo.

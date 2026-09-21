@@ -218,6 +218,8 @@ async function refresh() {
   mountAnims();
 }
 
+// The three slot animations are useAnimations (CC BY 4.0): the credit link is the licence.
+const CREDIT = `<p style="font-size:11px;color:var(--muted);margin:10px 4px 0">Animazioni di <a href="https://useanimations.com" target="_blank" rel="noopener" style="color:var(--muted)">useAnimations</a> (CC BY).</p>`;
 function emailCard(st) {
   const has = st.email;
   return `<div class="card">
@@ -286,7 +288,7 @@ function renderSetup(st) {
           ${pushBlocked() ? `<button class="sec" style="margin:12px 0 0 8px" onclick="waive()">Continua senza</button>` : ''}`}
       </div></div>
     ${done ? `<button class="sec" style="width:100%;margin-top:14px" onclick="showSetup=false;refresh()">Chiudi</button>` : ''}
-  </div>` + (showSetup ? emailCard(st) : '') + (st.user === 'owner' && showSetup ? accountsCard() : '');
+  </div>` + (showSetup ? emailCard(st) + CREDIT : '') + (st.user === 'owner' && showSetup ? accountsCard() : '');
   if (st.user === 'owner' && showSetup) loadAccounts();
 }
 

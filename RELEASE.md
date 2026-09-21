@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.22
+
+**1.4.22** — taglia: clicco il pulsante della griglia (non il doppione “Consigliato”), con tasto Spazio di riserva se il click non prende; se ancora non va, manda all’app cosa è successo.
+
 ## Quicksell 1.4.21
 
 **1.4.21** — taglia: il menu si chiude appena scegli e prima lo leggevo come “fallito”, riprovavo e la toglievo; ora la chiusura conta come conferma. Marca: trovo il riquadro di ricerca come “il campo nuovo che compare” e non richiudo un menu già aperto. Foto ora su R2 (niente più limiti di caricamento).

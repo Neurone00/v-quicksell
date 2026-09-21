@@ -219,19 +219,35 @@ async function pickInput(input, want, mode, harvestKey) {
   }
   // Already selected (this or a prior tick)? Don't click — a 2nd click unchecks a box.
   if (optChosen(menu, want, mode)) { closeMenu(); return 'ok'; }
-  const hit = optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), want, mode));
+  // Size: the flyout lists the value twice ("Consigliato" shortcut + the grid).
+  // The grid button has a stable data-testid (…grid-option…) — target it
+  // directly by exact aria-label so we never hit the wrong twin.
+  let hit = mode === 'token'
+    ? [...document.querySelectorAll('[data-testid*="grid-option"]')].find((o) => o.offsetParent && norm(optLabel(o)) === norm(want))
+    : null;
+  if (!hit) hit = optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), want, mode));
   if (!hit) { closeMenu(); return 'retry'; }           // options still loading
+  const fieldSet = () => !!(input.value.trim() && !/seleziona|scegli/i.test(input.value));
+  const closedNow = () => !menu.isConnected || menu.offsetParent === null;
+  const registered = () => hit.getAttribute?.('aria-checked') === 'true' || optChosen(menu, want, mode) || closedNow() || fieldSet();
   selectOption(hit);
-  await sleep2(300);
-  // Success signals, any one suffices:
-  //  - a matching option now reads checked (multi-select grids like colore)
-  //  - the menu CLOSED on the click (single-select like taglia closes on pick —
-  //    the option is gone, so it can't be re-scanned; the close IS the proof)
-  //  - the field shows a real value
-  // Without the "closed" signal, size was mis-read as failed, retried, and the
-  // 2nd click un-ticked it.
-  const closed = !menu.isConnected || menu.offsetParent === null;
-  const ok = optChosen(menu, want, mode) || closed || (input.value.trim() && !/seleziona|scegli/i.test(input.value));
+  await sleep2(400);
+  let ok = registered();
+  // FilterGrid buttons (size) sometimes ignore a synthetic click but take the
+  // keyboard: only if the click clearly did NOT register (aria-checked still
+  // false, nothing closed, field empty) press Space on the focused button.
+  if (!ok && mode === 'token') {
+    hit.focus && hit.focus();
+    for (const t of ['keydown', 'keyup']) hit.dispatchEvent(new KeyboardEvent(t, { key: ' ', code: 'Space', bubbles: true }));
+    await sleep2(400);
+    ok = registered();
+  }
+  if (!ok && mode === 'token') {                       // report exactly what we saw, once
+    send({ type: 'api', path: '/api/learn', method: 'POST', body: { url: location.pathname, sizeProbe: {
+      want, hitTestid: hit.getAttribute?.('data-testid'), hitAria: hit.getAttribute?.('aria-label'),
+      ariaCheckedAfter: hit.getAttribute?.('aria-checked'), fieldValue: input.value, menuClosed: closedNow(),
+      hitHtml: (hit.outerHTML || '').slice(0, 500) } } });
+  }
   closeMenu();
   return ok ? 'ok' : 'retry';
 }

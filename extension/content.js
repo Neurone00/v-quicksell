@@ -217,17 +217,17 @@ async function pickInput(input, want, mode, harvestKey) {
     type(input, mode === 'first' ? want.split(' ')[0] : want);
     menu = (await waitMenu(before)) || menu;
   }
-  if (!menu) return 'nomenu';
+  if (!menu) return 'retry';
   const hit = optionEls(menu).find((o) => matchOpt(norm(optLabel(o)), want, mode));
-  if (!hit) { closeMenu(); return 'nomatch'; }
-  // Already selected? Never click again — a second click UNchecks a checkbox
-  // (that's the material flicker: select → false 'nomatch' → re-click → off).
-  if (isChosen(hit, input)) { closeMenu(); return 'ok'; }
+  if (!hit) { closeMenu(); return 'retry'; }         // options maybe still loading
+  if (isChosen(hit, input)) { closeMenu(); return 'ok'; }   // a prior run already set it
+  // Click the matched option EXACTLY ONCE, then we're done. Never re-click:
+  // verifying a checkbox's state is unreliable, and a second click unchecks it
+  // (the size/material flicker). One deterministic click, then leave it.
   selectOption(hit);
-  await sleep2(250);
-  const ok = isChosen(hit, input);
+  await sleep2(200);
   closeMenu();
-  return ok ? 'ok' : 'nomatch';
+  return 'ok';
 }
 // Is this option (or its field) already selected?
 function isChosen(hit, fieldInput) {
@@ -280,7 +280,9 @@ function autoFill(it) {
         if (!el) continue;                     // field not rendered yet (before category)
         if (j.price) { if (!el.value) type(el, String(j.val)); j.done = true; continue; }
         const r = await pickInput(el, j.val, j.mode, j.harvest);
-        if (r === 'ok') j.done = true;         // retry on 'nomenu'/'nomatch' next tick
+        // 'ok' = clicked once (or already set) → done. 'retry' = menu/options not
+        // ready; try a few ticks, then give up and leave it for manual.
+        if (r === 'ok' || (j.tries = (j.tries || 0) + 1) >= 8) j.done = true;
       }
     } finally { running = false; }
     if (jobs.every((j) => j.done) || Date.now() > autoStop) finish();

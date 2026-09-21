@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.4.15
+
+**1.4.15** — la taglia non si de-seleziona più: ogni menu viene cliccato una volta sola e poi lasciato stare (niente ri-click che toglieva la spunta). Condizioni, colore, materiale già ok.
+
 ## Quicksell 1.4.14
 
 **1.4.14** — stop al “materiale impazzito”: se un’opzione è già spuntata non la riclicco (un secondo click su una casella la toglieva).

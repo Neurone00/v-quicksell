@@ -98,7 +98,6 @@ async function load() {
         <div class="txt">
           <a class="t" href="${i.vinted_url}" target="_blank" title="${esc(i.title)}">${esc(i.title)}</a>
           <div><span class="price">${i.current_price} €</span> <small>· min ${i.floor_price} €${i.due_price ? ' · <span class="due">ribasso oggi</span>' : ''}</small></div>
-          <button class="fix" data-fix="${i.id}">Correggi link</button>
         </div></div>`).join('')
     : `<div class="card"><small>Nessun annuncio attivo. Pubblica un capo, poi collega l'annuncio: comparirà qui e da lì l'app segue il prezzo.</small></div>`;
   // Thumbnails: the background holds the account key, so it fetches the photo
@@ -107,14 +106,6 @@ async function load() {
     const key = (i.photos || [])[0];
     if (key) send({ type: 'photo', key }).then((r) => { const im = document.getElementById('th-' + i.id); if (r?.ok && im) im.src = r.data; });
   }
-  for (const b of document.querySelectorAll('button[data-fix]')) b.onclick = async () => {
-    const url = window.prompt("Incolla il link dell'annuncio giusto (…vinted.it/items/…):");
-    if (!url) return;
-    if (!/vinted\.it\/items\/\d+/.test(url)) { alert('Non sembra un link a un annuncio Vinted.'); return; }
-    b.textContent = 'Collego…';
-    const r = await send({ type: 'api', path: `/api/items/${b.dataset.fix}/published`, method: 'POST', body: { url: url.trim() } });
-    if (r?.ok) load(); else { b.textContent = 'Riprova'; }
-  };
 }
 
 // Diagnostics: ask the content script on the active Vinted tab what it sees.

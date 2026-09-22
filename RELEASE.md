@@ -1,5 +1,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Neurone00/v-quicksell/main/brand/banner.png" alt="Quicksell" width="700"></p>
 
+## Quicksell 1.5.3
+
+**1.5.3** — via il tasto “Correggi link”: il collegamento all’annuncio è giusto dal primo momento. Lato app: i titoli escono con le maiuscole giuste (“Camicia Tom Tailor denim blu S”) e le foto ricevono una leggera post-produzione (luce, contrasto, nitidezza).
+
 ## Quicksell 1.5.2
 
 **1.5.2** — collegamento annuncio più sicuro: viene collegato solo l’annuncio il cui link contiene le parole del titolo (non un annuncio sfogliato per caso), e il collegamento in sospeso scade dopo 30 minuti. Nel pannello: foto, titolo su una riga e “Correggi link” se un annuncio punta all’articolo sbagliato.

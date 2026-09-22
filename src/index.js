@@ -1,5 +1,5 @@
 import * as V from './vinted.js';
-import { analysePhotos, priceFromComparables, healChoice } from './ai.js';
+import { analysePhotos, priceFromComparables, healChoice, mockupImage } from './ai.js';
 import { notify } from './push.js';
 import { listPrice, nextPrice, round9 } from './price.js';
 
@@ -82,6 +82,18 @@ async function sendEmail(env, to, subject, html) {
     body: JSON.stringify({ from: env.MAIL_FROM || 'Quicksell <onboarding@resend.dev>', to, subject, html }),
   });
   return r.ok;
+}
+
+// The model tends to write titles all-lowercase. Vinted titles read best in
+// sentence case with the brand as it is written and the size in capitals —
+// enforce it so it can't slip: "camicia tom tailor denim blu s" ->
+// "Camicia Tom Tailor denim blu S".
+function properTitle(t, brand) {
+  let s = String(t || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  if (brand) s = s.replace(new RegExp(brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), brand);
+  s = s.replace(/\b(xxs|xs|s|m|l|xl|xxl|xxxl|[345]xl)$/i, (m) => m.toUpperCase());              // trailing size
+  s = s.replace(/\b(taglia|tg|size)\s+(xxs|xs|s|m|l|xl|xxl|xxxl|[345]xl)\b/ig, (_, w, z) => `${w} ${z.toUpperCase()}`);
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 async function photoToken(env, key) {
@@ -337,6 +349,22 @@ async function route(p, req, env, ctx, url, user) {
 
   if (p === '/api/learned') return json(JSON.parse((await env.KV.get('learned')) || '[]'));
 
+  // On-model mockup preview: ?id=<item>&who=uomo|donna -> a JPEG/PNG of the
+  // cover photo's garment worn by a model. Preview only, nothing is saved:
+  // AI "worn" photos may fall foul of Vinted's real-photo rule, so the
+  // decision to attach them to a listing stays with the human.
+  if (p === '/api/mockup') {
+    const id = Number(url.searchParams.get('id')), who = url.searchParams.get('who') === 'donna' ? 'donna' : 'uomo';
+    const it = await env.DB.prepare('SELECT title, photos FROM items WHERE id=? AND user_id=?').bind(id, user).first();
+    if (!it) return json({ error: 'not found' }, 404);
+    const buf = await photoGet(env, JSON.parse(it.photos)[0]);
+    if (!buf) return json({ error: 'no photo' }, 404);
+    try {
+      const img = await mockupImage(env, bufToB64(buf), who, it.title);
+      return new Response(Uint8Array.from(atob(img.data), (c) => c.charCodeAt(0)), { headers: { 'content-type': img.mimeType } });
+    } catch (e) { return json({ error: String(e.message).slice(0, 300) }, 502); }
+  }
+
   // The extension harvests Vinted's real dropdown options and posts them here;
   // the analyzer then constrains the AI to exactly these, for a 1:1 fill.
   if (p === '/api/enums' && req.method === 'POST') {
@@ -449,14 +477,17 @@ async function drainAll(env) {
   for (let i = 0; i < 25; i++) { if (!(await drainQueue(env))) break; }
 }
 
-// Basic post-production via the Images binding; raw photo if it caps out.
+// Post-production via the Images binding (free allowance): fit to 1200, then a
+// mild "phone photo -> shop photo" grade: a touch brighter, more contrast and
+// colour, sharpened. Kept subtle so it never lies about the item. Raw photo
+// if the binding is missing or caps out.
 async function processPhoto(env, file) {
   const buf = (b) => new Response(b).arrayBuffer();
   if (!env.IMAGES) return buf(file.stream());
   try {
     const out = await env.IMAGES.input(file.stream())
       .transform({ width: 1200, height: 1200, fit: 'contain', background: '#ffffff' })
-      .transform({ sharpen: 1 })
+      .transform({ brightness: 1.04, contrast: 1.08, saturation: 1.04, sharpen: 1.2 })
       .output({ format: 'image/jpeg', quality: 88 });
     return buf(out.image());
   } catch { return buf(file.stream()); }
@@ -477,6 +508,7 @@ async function analyse(env, id) {
     }
     const enums = JSON.parse((await env.KV.get('vinted_enums')) || '{}');
     const a = await analysePhotos(env, b64, enums);
+    a.title = properTitle(a.title, a.brand);   // sentence case, brand as written, size in capitals
 
     // Put the AI-picked best photo first — Vinted uses photo #1 as the cover.
     const photos = JSON.parse(item.photos);

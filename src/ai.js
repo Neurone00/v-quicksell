@@ -118,6 +118,35 @@ confidence tra 0 e 1.`;
   return gemini(env, [{ text }], HEAL_SCHEMA);
 }
 
+// On-model mockup: the item photo in, the same garment worn by a model out.
+// Flash image models are on the free tier; the pro one is not, so it is not
+// in the list. Returns { mimeType, data(base64) }.
+const IMAGE_MODELS = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
+export async function mockupImage(env, b64, who, title) {
+  const person = who === 'donna' ? 'una modella donna' : 'un modello uomo';
+  const text = `Foto e-commerce: ${person}, adulto, corporatura media, indossa ESATTAMENTE questo capo (${title || 'capo'}) come appare nella foto: stesso colore, stessa fantasia, stessi dettagli, stesse proporzioni. Non inventare loghi, scritte o dettagli che non ci sono. Inquadratura a tre quarti, in piedi, posa naturale e rilassata, sfondo neutro chiaro uniforme, luce morbida da studio, look da catalogo. Nessun testo nell'immagine.`;
+  let last;
+  for (const model of IMAGE_MODELS) {
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text }, { inlineData: { mimeType: 'image/jpeg', data: b64 } }] }],
+          generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '3:4' } },
+        }),
+        signal: AbortSignal.timeout(90000),
+      });
+      if (!r.ok) { last = new Error(`${model} ${r.status}: ${(await r.text()).slice(0, 200)}`); continue; }
+      const j = await r.json();
+      const img = (j.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData)?.inlineData;
+      if (img) return img;
+      last = new Error(`${model}: no image (${JSON.stringify(j).slice(0, 160)})`);
+    } catch (e) { last = e; }
+  }
+  throw last;
+}
+
 // Photos in, a full Italian Vinted listing out. `enums` = Vinted's real option
 // lists (from KV), when the extension has harvested them yet.
 export async function analysePhotos(env, images, enums) {
@@ -189,7 +218,7 @@ ${rows}`,
 const PROMPT_ANALYSE = `Sei un venditore esperto su Vinted Italia. Analizza le foto di UN SOLO capo/oggetto e produci un annuncio in ITALIANO che massimizzi le vendite.
 
 REGOLE:
-- title: max 60 caratteri. Formato che vende su Vinted: Tipo + Marca + colore/materiale + taglia. Niente emoji, niente MAIUSCOLO, niente "vendo".
+- title: max 60 caratteri. Formato che vende su Vinted: Tipo + Marca + colore/materiale + taglia. Maiuscole SOLO: la prima lettera, i nomi di marca scritti come si scrivono (Tom Tailor, Zara, H&M) e la taglia (S, M, L, 42). Tutto il resto minuscolo. Esempio: "Camicia Tom Tailor denim blu fantasia S". Niente emoji, niente TUTTO MAIUSCOLO, niente "vendo".
 - description: 3-6 righe in italiano. Cosa e, materiale, vestibilita, condizioni reali e oneste (dichiara ogni difetto visibile), misure se deducibili. Chiudi con una riga tipo "Spedizione rapida, fumo/animali assenti" solo se plausibile. Niente hashtag.
 - brand: SOLO se leggi il nome su un'etichetta, un cartellino o un logo stampato nelle foto. Metti brand_from_label=true solo in quel caso. Se deduci la marca dallo stile senza vederla scritta, scrivila comunque ma brand_from_label=false.
 - size: SOLO dall'etichetta taglia. size_from_label=true solo se la leggi. Usa la notazione dell'etichetta (XS/S/M/L, o 38/40/42).

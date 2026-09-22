@@ -126,7 +126,9 @@ export async function mockupImage(env, jpeg, who, title) {
   const person = who === 'donna' ? 'a woman model' : 'a man model';
   const form = new FormData();
   form.append('input_image_0', new Blob([jpeg], { type: 'image/jpeg' }));
-  form.append('prompt', `E-commerce catalog photo of ${person}, adult, average build, wearing exactly the garment from the reference image (${title || 'garment'}): identical colour, pattern, buttons and proportions, no invented logos or text. Three-quarter shot, standing, relaxed natural pose, plain light neutral studio background, soft studio light, photorealistic.`);
+  // Fashion illustration, not a photo: reads as a render at a glance, so it
+  // never passes for a photo of the item (and Vinted's real-photo rule).
+  form.append('prompt', `Fashion illustration, hand-drawn sketch style: ${person}, adult, elongated fashion-croquis proportions, wearing exactly the garment from the reference image (${title || 'garment'}): identical colour, pattern, sleeve length, buttons and details, no invented logos or text. Full-length standing pose, three-quarter view, loose confident ink linework with watercolour and marker washes, generous white paper background, no photorealism, editorial fashion-design sketchbook look.`);
   form.append('width', '768');
   form.append('height', '1024');
   const body = new Response(form);

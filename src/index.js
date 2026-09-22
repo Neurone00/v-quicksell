@@ -360,7 +360,8 @@ async function route(p, req, env, ctx, url, user) {
     const buf = await photoGet(env, JSON.parse(it.photos)[0]);
     if (!buf) return json({ error: 'no photo' }, 404);
     try {
-      const img = await mockupImage(env, await small512(env, buf), who, { title: it.title, sketch_crop: url.searchParams.get('crop') });
+      const img = await mockupImage(env, await small512(env, buf), who,
+        { title: it.title, sketch_crop: url.searchParams.get('crop'), sketch_spec: url.searchParams.get('spec') });
       return new Response(Uint8Array.from(atob(img.data), (c) => c.charCodeAt(0)), { headers: { 'content-type': img.mimeType } });
     } catch (e) { return json({ error: String(e.message).slice(0, 900) }, 502); }
   }

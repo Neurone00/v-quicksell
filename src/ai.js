@@ -1,3 +1,5 @@
+import { sketchPrompt } from './sketch.js';
+
 // Gemini Flash: reads the photos, writes the listing, prices it.
 // ponytail: one model for vision + text + pricing. Workers AI vision was the
 // alternative but is worse at small care-label text and burns the free neurons.
@@ -126,21 +128,13 @@ confidence tra 0 e 1.`;
 // reference image. Gemini's image models have a zero free-tier quota, so they
 // are not an option here. `jpeg` must be under 512x512. Returns base64 PNG.
 export async function mockupImage(env, jpeg, who, { title, sketch_spec: spec, sketch_crop: crop } = {}) {
-  const person = who === 'donna' ? 'a woman model' : 'a man model';
   const form = new FormData();
   form.append('input_image_0', new Blob([jpeg], { type: 'image/jpeg' }));
-  // Fashion illustration, not a photo: reads as a render at a glance, so it
-  // never passes for a photo of the item (and Vinted's real-photo rule).
-  // Framed on the garment, not the whole figure; `spec` (from the analysis)
-  // spells out sleeves/buttons/pattern because the model reads the
-  // reference image loosely.
-  const CROP = {
-    busto: 'framed from the head to the hips, the garment fills the frame',
-    gambe: 'framed from the waist to the shoes, the garment fills the frame',
-    'figura-intera': 'full-length standing figure',
-    dettaglio: 'close crop on the item itself, the wearer mostly out of frame',
-  };
-  form.append('prompt', `Fashion illustration, hand-drawn sketch style: ${person}, adult, wearing exactly the garment from the reference image (${title || 'garment'}). Garment spec, follow it precisely: ${spec || 'same colour, pattern, sleeve length, buttons and details as the reference'}. No invented logos, text, pockets or details. ${CROP[crop] || CROP.busto}, three-quarter view, relaxed pose, loose confident ink linework with watercolour and marker washes, generous white paper background, no photorealism, editorial fashion-design sketchbook look.`);
+  // An illustration, not a photo: reads as a render at a glance, so it never
+  // passes for a photo of the item (Vinted's real-photo rule). Framed on the
+  // garment; `spec` (from the analysis) spells out sleeves/buttons/pattern
+  // because the model reads the reference image loosely. Prompt: src/sketch.js.
+  form.append('prompt', sketchPrompt({ who, title, spec, crop }));
   form.append('width', '768');
   form.append('height', '1024');
   const body = new Response(form);

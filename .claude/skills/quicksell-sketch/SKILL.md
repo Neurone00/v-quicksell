@@ -36,7 +36,18 @@ Rules of thumb that held in testing:
 - Reference image must be < 512 px on each side (`small512()` does it) and go in as `input_image_0`. Output is base64 JPEG in `out.image`, 768×1024.
 - Gemini's image models are **not free** on this key (`limit: 0`) — don't switch back.
 
-## How to test a change (≈30 s per image, free)
+## The judge loop (built in, don't bypass)
+
+`sketchWithJudge()` in `src/ai.js`: generate → `judgeSketch()` (Gemini, free)
+compares the reference photo with the sketch on garment only (colour,
+pattern, sleeves, collar, buttons, pockets, length) → score 0-10 + a
+rewritten positive-language spec → regenerate with that spec → up to **3**
+tries, best score kept, 8+ stops early. Both the pipeline and the preview
+route use it; the route returns `x-sketch-score`, `x-sketch-tries`,
+`x-sketch-problems` headers. Tuning fidelity = tuning the judge prompt
+(`JUDGE_SCHEMA` text), not adding tries: each try is ~30 s + a Gemini call.
+
+## How to test a change (≈30–100 s per image, free)
 
 The preview route uses the same prompt builder but takes the spec by hand:
 
@@ -45,7 +56,7 @@ K=$(grep '^APP_SECRET' .dev.vars | cut -d= -f2 | tr -d '"'); S=scratch
 # 1. a draft you own (the pipeline will also sketch it in the background — fine, delete after)
 ID=$(curl -s -F "photos=@$S/shirt.jpg;type=image/jpeg" "https://v-quicksell.neurone00.workers.dev/api/items?k=$K" | sed -n 's/.*"id":\([0-9]*\).*/\1/p')
 # 2. one image, hand-written spec, chosen crop
-curl -s -o "$S/test.jpg" "https://v-quicksell.neurone00.workers.dev/api/mockup?id=$ID&who=uomo&crop=busto&k=$K&spec=$(python3 -c 'import urllib.parse;print(urllib.parse.quote("dark navy shirt with small white plus-sign print, short sleeves, brown wooden buttons, button-down collar, no pockets"))')"
+curl -s -D - -o "$S/test.jpg" "https://v-quicksell.neurone00.workers.dev/api/mockup?id=$ID&who=uomo&crop=busto&k=$K&spec=$(python3 -c 'import urllib.parse;print(urllib.parse.quote("dark navy shirt with small white plus-sign print, short sleeves, brown wooden buttons, button-down collar, plain front"))')" | grep -i x-sketch
 # 3. look at it, then clean up
 npx wrangler d1 execute quicksell --remote --command "DELETE FROM items WHERE id=$ID AND user_id='owner'"
 ```

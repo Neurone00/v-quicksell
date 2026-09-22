@@ -1,5 +1,5 @@
 import * as V from './vinted.js';
-import { analysePhotos, priceFromComparables, healChoice, mockupImage } from './ai.js';
+import { analysePhotos, priceFromComparables, healChoice, sketchWithJudge } from './ai.js';
 import { notify } from './push.js';
 import { listPrice, nextPrice, round9 } from './price.js';
 
@@ -360,9 +360,12 @@ async function route(p, req, env, ctx, url, user) {
     const buf = await photoGet(env, JSON.parse(it.photos)[0]);
     if (!buf) return json({ error: 'no photo' }, 404);
     try {
-      const img = await mockupImage(env, await small512(env, buf), who,
-        { title: it.title, sketch_crop: url.searchParams.get('crop'), sketch_spec: url.searchParams.get('spec') });
-      return new Response(Uint8Array.from(atob(img.data), (c) => c.charCodeAt(0)), { headers: { 'content-type': img.mimeType } });
+      // Same generate→judge→retry loop as the pipeline; the verdict rides in headers.
+      const best = await sketchWithJudge(env, await small512(env, buf), who,
+        { title: it.title, sketch_crop: url.searchParams.get('crop'), sketch_spec: url.searchParams.get('spec') }, 3);
+      return new Response(Uint8Array.from(atob(best.img.data), (c) => c.charCodeAt(0)), { headers: {
+        'content-type': best.img.mimeType, 'x-sketch-score': String(best.score), 'x-sketch-tries': String(best.tries),
+        'x-sketch-problems': encodeURIComponent((best.problems || []).join('; ')).slice(0, 900) } });
     } catch (e) { return json({ error: String(e.message).slice(0, 900) }, 502); }
   }
 
@@ -569,10 +572,13 @@ async function addSketches(env, id, photos, a) {
   const added = [];
   for (const who of whos) {
     try {
-      const img = await mockupImage(env, ref, who, a);
+      // Generate → AI judge against the photo → regenerate with the judge's
+      // corrected spec, up to 3 times; the best-scoring one is kept.
+      const best = await sketchWithJudge(env, ref, who, a, 3);
       const key = `${photos[0].replace(/\.jpg$/, '')}-sketch-${who}.jpg`;
-      await photoPut(env, key, Uint8Array.from(atob(img.data), (c) => c.charCodeAt(0)));
+      await photoPut(env, key, Uint8Array.from(atob(best.img.data), (c) => c.charCodeAt(0)));
       added.push(key);
+      console.log('sketch', id, who, `score ${best.score} after ${best.tries}`, (best.problems || []).join('; '));
     } catch (e) { console.log('sketch failed', id, who, String(e.message).slice(0, 160)); }
   }
   if (!added.length) return;

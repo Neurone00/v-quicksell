@@ -145,6 +145,56 @@ export async function mockupImage(env, jpeg, who, { title, sketch_spec: spec, sk
   return { mimeType: 'image/jpeg', data: out.image };   // measured: the model hands back JPEG
 }
 
+// Judge: does the sketch show THIS garment? Gemini (free tier) compares the
+// reference photo with the sketch and, if not, says what to fix in positive
+// spec language ("short sleeves", not "no long sleeves") since FLUX ignores
+// negatives. Score 0-10; 8+ is a keeper.
+const JUDGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    score: { type: 'integer' },
+    problems: { type: 'array', items: { type: 'string' } },
+    spec_fix: { type: 'string' },
+  },
+  required: ['score', 'problems', 'spec_fix'],
+};
+export async function judgeSketch(env, refB64, sketchB64, spec) {
+  const text = `Image 1 is a real photo of a garment for sale. Image 2 is an illustration that is supposed to show a person wearing THAT SAME garment. Judge ONLY the garment (ignore art style, the person, the background).
+Spec the illustrator was given: "${spec || '(none)'}".
+Compare: colour, pattern/print, sleeve length, collar, closure (buttons: count/colour), pockets, overall length and fit.
+- score: 0-10 how faithfully image 2 shows the garment in image 1. 8+ means a buyer would recognise it as the same garment.
+- problems: each mismatch in one short English phrase.
+- spec_fix: a rewritten garment spec in English, 1-2 sentences, describing the garment in image 1 precisely, phrased as POSITIVE statements only (say "short sleeves ending above the elbow", "plain front with no chest pocket" — never "no X"). Mention the exact things that went wrong first.`;
+  return gemini(env, [
+    { text },
+    { inlineData: { mimeType: 'image/jpeg', data: refB64 } },
+    { inlineData: { mimeType: 'image/jpeg', data: sketchB64 } },
+  ], JUDGE_SCHEMA);
+}
+
+// Generate, judge, regenerate with the judge's spec: up to `max` tries, keep
+// the best. Returns { img, score, tries, problems }.
+export async function sketchWithJudge(env, jpeg, who, a, max = 3) {
+  const refB64 = bufToB64(jpeg);
+  let best = null, spec = a.sketch_spec;
+  for (let i = 1; i <= max; i++) {
+    const img = await mockupImage(env, jpeg, who, { ...a, sketch_spec: spec });
+    let v;
+    try { v = await judgeSketch(env, refB64, img.data, spec); }
+    catch { v = { score: 5, problems: ['judge failed'], spec_fix: spec }; }
+    if (!best || v.score > best.score) best = { img, score: v.score, tries: i, problems: v.problems, spec };
+    if (v.score >= 8) break;
+    spec = v.spec_fix || spec;
+  }
+  return best;
+}
+function bufToB64(buf) {
+  let s = '';
+  const u = new Uint8Array(buf);
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
 // Photos in, a full Italian Vinted listing out. `enums` = Vinted's real option
 // lists (from KV), when the extension has harvested them yet.
 export async function analysePhotos(env, images, enums) {

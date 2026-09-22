@@ -67,6 +67,9 @@ const ANALYSIS_SCHEMA = {
     color: { type: 'string' },
     condition: { type: 'string' },
     cover_index: { type: 'integer' },
+    gender: { type: 'string', enum: ['uomo', 'donna', 'unisex'] },
+    sketch_crop: { type: 'string', enum: ['busto', 'gambe', 'figura-intera', 'dettaglio'] },
+    sketch_spec: { type: 'string' },
     category_query: { type: 'string' },
     search_query: { type: 'string' },
     missing: { type: 'array', items: { type: 'string' } },
@@ -122,13 +125,22 @@ confidence tra 0 e 1.`;
 // Workers AI FLUX.2 [klein] (free daily allowance) with the photo as the
 // reference image. Gemini's image models have a zero free-tier quota, so they
 // are not an option here. `jpeg` must be under 512x512. Returns base64 PNG.
-export async function mockupImage(env, jpeg, who, title) {
+export async function mockupImage(env, jpeg, who, { title, sketch_spec: spec, sketch_crop: crop } = {}) {
   const person = who === 'donna' ? 'a woman model' : 'a man model';
   const form = new FormData();
   form.append('input_image_0', new Blob([jpeg], { type: 'image/jpeg' }));
   // Fashion illustration, not a photo: reads as a render at a glance, so it
   // never passes for a photo of the item (and Vinted's real-photo rule).
-  form.append('prompt', `Fashion illustration, hand-drawn sketch style: ${person}, adult, elongated fashion-croquis proportions, wearing exactly the garment from the reference image (${title || 'garment'}): identical colour, pattern, sleeve length, buttons and details, no invented logos or text. Full-length standing pose, three-quarter view, loose confident ink linework with watercolour and marker washes, generous white paper background, no photorealism, editorial fashion-design sketchbook look.`);
+  // Framed on the garment, not the whole figure; `spec` (from the analysis)
+  // spells out sleeves/buttons/pattern because the model reads the
+  // reference image loosely.
+  const CROP = {
+    busto: 'framed from the head to the hips, the garment fills the frame',
+    gambe: 'framed from the waist to the shoes, the garment fills the frame',
+    'figura-intera': 'full-length standing figure',
+    dettaglio: 'close crop on the item itself, the wearer mostly out of frame',
+  };
+  form.append('prompt', `Fashion illustration, hand-drawn sketch style: ${person}, adult, wearing exactly the garment from the reference image (${title || 'garment'}). Garment spec, follow it precisely: ${spec || 'same colour, pattern, sleeve length, buttons and details as the reference'}. No invented logos, text, pockets or details. ${CROP[crop] || CROP.busto}, three-quarter view, relaxed pose, loose confident ink linework with watercolour and marker washes, generous white paper background, no photorealism, editorial fashion-design sketchbook look.`);
   form.append('width', '768');
   form.append('height', '1024');
   const body = new Response(form);
@@ -217,6 +229,9 @@ REGOLE:
 - material: dall'etichetta di composizione se visibile.
 - condition: ESATTAMENTE uno tra "Nuovo con cartellino", "Nuovo senza cartellino", "Ottime", "Buone", "Discrete" (sono le etichette esatte di Vinted). Sii onesto: i resi e le recensioni negative costano piu di qualche euro.
 - cover_index: l'indice (0-based) della foto MIGLIORE da usare come copertina, tra quelle fornite nell'ordine ricevuto. La copertina ideale mostra il capo intero, a fuoco, ben illuminato, su sfondo pulito, dritto. Se la prima e' gia' la migliore, rispondi 0.
+- gender: "uomo" se e' un capo da uomo, "donna" se da donna, "unisex" solo se davvero non si capisce (bambino/oggetti: "unisex").
+- sketch_crop: inquadratura per un'illustrazione del capo indossato: "busto" per top, camicie, maglie, giacche, felpe; "gambe" per pantaloni, gonne, shorts, scarpe; "figura-intera" per vestiti, cappotti, tute; "dettaglio" per accessori, borse, cappelli, oggetti non indossabili.
+- sketch_spec: IN INGLESE, 1-2 frasi che descrivono il capo come specifica per un illustratore: tipo, colore esatto, fantasia (es "small white cross/plus-sign print on dark navy"), lunghezza maniche, tipo e colore dei bottoni/zip, colletto, tasche (o "no pockets"), vestibilita. Solo cio' che vedi.
 - category_query: 2-4 parole per trovare la categoria Vinted, es "felpa donna cappuccio".
 - search_query: la query con cui cercare su Vinted articoli identici per confrontare i prezzi. Marca + tipo + taglia se noti.
 - missing: elenca i campi che NON riesci a determinare con certezza dalle foto (es "size", "brand", "material"). Se manca la foto dell'etichetta, dillo.`;

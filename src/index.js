@@ -360,11 +360,7 @@ async function route(p, req, env, ctx, url, user) {
     const buf = await photoGet(env, JSON.parse(it.photos)[0]);
     if (!buf) return json({ error: 'no photo' }, 404);
     try {
-      // FLUX wants the reference under 512px on each side.
-      const small = env.IMAGES
-        ? await new Response((await env.IMAGES.input(new Response(buf).body).transform({ width: 500, height: 500, fit: 'scale-down' }).output({ format: 'image/jpeg', quality: 90 })).image()).arrayBuffer()
-        : buf;
-      const img = await mockupImage(env, small, who, it.title);
+      const img = await mockupImage(env, await small512(env, buf), who, { title: it.title, sketch_crop: url.searchParams.get('crop') });
       return new Response(Uint8Array.from(atob(img.data), (c) => c.charCodeAt(0)), { headers: { 'content-type': img.mimeType } });
     } catch (e) { return json({ error: String(e.message).slice(0, 900) }, 502); }
   }
@@ -548,9 +544,41 @@ async function analyse(env, id) {
       id
     ).run();
     await notify(env, item.user_id);
+    await addSketches(env, id, photos, a);
   } catch (e) {
     await fail(String(e.message || e).slice(0, 400));
   }
+}
+
+// FLUX wants the reference under 512px on each side.
+async function small512(env, buf) {
+  if (!env.IMAGES) return buf;
+  const out = await env.IMAGES.input(new Response(buf).body).transform({ width: 500, height: 500, fit: 'scale-down' }).output({ format: 'image/jpeg', quality: 90 });
+  return new Response(out.image()).arrayBuffer();
+}
+
+// Worn-look fashion sketch(es) of the cover photo, appended as the LAST
+// photo(s), with the description saying so. Man's item -> man, woman's ->
+// woman, unisex -> both. Runs after the draft is already usable; any failure
+// just means no sketch. ponytail: no retries, FLUX is either up or not.
+async function addSketches(env, id, photos, a) {
+  if (!env.AI) return;
+  const whos = a.gender === 'unisex' ? ['uomo', 'donna'] : [a.gender === 'donna' ? 'donna' : 'uomo'];
+  const ref = await small512(env, await photoGet(env, photos[0]));
+  const added = [];
+  for (const who of whos) {
+    try {
+      const img = await mockupImage(env, ref, who, a);
+      const key = `${photos[0].replace(/\.jpg$/, '')}-sketch-${who}.jpg`;
+      await photoPut(env, key, Uint8Array.from(atob(img.data), (c) => c.charCodeAt(0)));
+      added.push(key);
+    } catch (e) { console.log('sketch failed', id, who, String(e.message).slice(0, 160)); }
+  }
+  if (!added.length) return;
+  const note = added.length > 1 ? "\n\nLe ultime immagini sono illustrazioni indicative (AI), non foto del capo."
+    : "\n\nL'ultima immagine è un'illustrazione indicativa (AI), non una foto del capo.";
+  await env.DB.prepare('UPDATE items SET photos=?, description=description||? WHERE id=?')
+    .bind(JSON.stringify([...photos, ...added]), note, id).run();
 }
 
 // Approve = "ready for me to publish". Nothing is written to Vinted, ever.

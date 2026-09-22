@@ -3,9 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>V Quicksell</title>
+<title>Quicksell</title>
+<meta name="description" content="Fotografa un capo: Quicksell scrive l'annuncio Vinted, lo prezza e segue i ribassi. Tu pubblichi.">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#007782">
+<!-- Brand: Calypso chrome on light, the page ground on dark (brand/tokens.css). -->
+<meta name="theme-color" content="#007782" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1212" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="apple-mobile-web-app-title" content="Quicksell">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta property="og:title" content="Quicksell">
+<meta property="og:description" content="Fotografa un capo: l'annuncio Vinted si scrive e si prezza da solo. Tu pubblichi.">
+<meta property="og:image" content="https://v-quicksell.neurone00.workers.dev/icon-512.png">
+<meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie_light.min.js" defer></script>
@@ -33,7 +47,8 @@ header{position:sticky;top:0;z-index:20;background:var(--page);
 h1{font:600 25px/1 Fraunces,Georgia,serif;font-variation-settings:'SOFT' 60;
   margin:0;flex:1;color:var(--calypso);letter-spacing:-.01em}
 .v{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
-.gear{padding:7px 11px;font-size:15px;line-height:1;border-radius:99px}
+.gear{padding:8px;line-height:0;border-radius:99px}
+.gear svg{width:18px;height:18px;display:block}
 main{padding:0 20px;max-width:640px;margin:0 auto}
 
 /* The Kiln "flowing line": one thread down the whole journey. */
@@ -151,7 +166,7 @@ body.gated{overflow:hidden} body.gated .fab{display:none}
 </head>
 <body>
 <header><h1>Quicksell</h1><span class="v" id="ver"></span>
-<button class="gear sec" id="gear" title="Impostazioni" aria-label="Impostazioni">⚙</button></header>
+<button class="gear sec" id="gear" title="Impostazioni" aria-label="Impostazioni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></header>
 <main><div id="setup"></div><div id="list"></div></main>
 <input type="file" id="file" accept="image/*" multiple hidden>
 <button class="fab" id="add">Aggiungi le foto di un capo</button>

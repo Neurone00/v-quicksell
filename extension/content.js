@@ -461,7 +461,7 @@ function setAutoStatus(left) {
   if (!box) return;
   box.innerHTML = left.length
     ? `<span style="color:#B4690E">Da mettere a mano: <b>${left.join(', ')}</b> — i valori sono qui sotto.</span>`
-    : `<span style="color:#1F6F6B">Compilato tutto ✓ — controlla e pubblica.</span>`;
+    : `<span style="color:#32AE88">Compilato tutto ✓ — controlla e pubblica.</span>`;   // mint = done (brand)
 }
 
 function hints(it, missing, photosOk) {

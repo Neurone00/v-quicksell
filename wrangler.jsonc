@@ -21,6 +21,8 @@
 
   "triggers": { "crons": ["* * * * *", "0 9 * * *"] },
 
+  // Workers AI (free daily neuron allowance): on-model mockups via FLUX.2 klein.
+  "ai": { "binding": "AI" },
   "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "quicksell" }],
   "vars": {
     "VINTED_HOST": "www.vinted.it",

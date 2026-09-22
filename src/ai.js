@@ -119,32 +119,22 @@ confidence tra 0 e 1.`;
 }
 
 // On-model mockup: the item photo in, the same garment worn by a model out.
-// Flash image models are on the free tier; the pro one is not, so it is not
-// in the list. Returns { mimeType, data(base64) }.
-const IMAGE_MODELS = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
-export async function mockupImage(env, b64, who, title) {
-  const person = who === 'donna' ? 'una modella donna' : 'un modello uomo';
-  const text = `Foto e-commerce: ${person}, adulto, corporatura media, indossa ESATTAMENTE questo capo (${title || 'capo'}) come appare nella foto: stesso colore, stessa fantasia, stessi dettagli, stesse proporzioni. Non inventare loghi, scritte o dettagli che non ci sono. Inquadratura a tre quarti, in piedi, posa naturale e rilassata, sfondo neutro chiaro uniforme, luce morbida da studio, look da catalogo. Nessun testo nell'immagine.`;
-  let last;
-  for (const model of IMAGE_MODELS) {
-    try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text }, { inlineData: { mimeType: 'image/jpeg', data: b64 } }] }],
-          generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '3:4' } },
-        }),
-        signal: AbortSignal.timeout(90000),
-      });
-      if (!r.ok) { last = new Error(`${model} ${r.status}: ${(await r.text()).slice(0, 200)}`); continue; }
-      const j = await r.json();
-      const img = (j.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData)?.inlineData;
-      if (img) return img;
-      last = new Error(`${model}: no image (${JSON.stringify(j).slice(0, 160)})`);
-    } catch (e) { last = e; }
-  }
-  throw last;
+// Workers AI FLUX.2 [klein] (free daily allowance) with the photo as the
+// reference image. Gemini's image models have a zero free-tier quota, so they
+// are not an option here. `jpeg` must be under 512x512. Returns base64 PNG.
+export async function mockupImage(env, jpeg, who, title) {
+  const person = who === 'donna' ? 'a woman model' : 'a man model';
+  const form = new FormData();
+  form.append('input_image_0', new Blob([jpeg], { type: 'image/jpeg' }));
+  form.append('prompt', `E-commerce catalog photo of ${person}, adult, average build, wearing exactly the garment from the reference image (${title || 'garment'}): identical colour, pattern, buttons and proportions, no invented logos or text. Three-quarter shot, standing, relaxed natural pose, plain light neutral studio background, soft studio light, photorealistic.`);
+  form.append('width', '768');
+  form.append('height', '1024');
+  const body = new Response(form);
+  const out = await env.AI.run('@cf/black-forest-labs/flux-2-klein-4b', {
+    multipart: { body: body.body, contentType: body.headers.get('content-type') },
+  });
+  if (!out?.image) throw new Error('flux: no image ' + JSON.stringify(out).slice(0, 200));
+  return { mimeType: 'image/jpeg', data: out.image };   // measured: the model hands back JPEG
 }
 
 // Photos in, a full Italian Vinted listing out. `enums` = Vinted's real option

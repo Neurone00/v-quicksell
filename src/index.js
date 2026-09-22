@@ -360,9 +360,13 @@ async function route(p, req, env, ctx, url, user) {
     const buf = await photoGet(env, JSON.parse(it.photos)[0]);
     if (!buf) return json({ error: 'no photo' }, 404);
     try {
-      const img = await mockupImage(env, bufToB64(buf), who, it.title);
+      // FLUX wants the reference under 512px on each side.
+      const small = env.IMAGES
+        ? await new Response((await env.IMAGES.input(new Response(buf).body).transform({ width: 500, height: 500, fit: 'scale-down' }).output({ format: 'image/jpeg', quality: 90 })).image()).arrayBuffer()
+        : buf;
+      const img = await mockupImage(env, small, who, it.title);
       return new Response(Uint8Array.from(atob(img.data), (c) => c.charCodeAt(0)), { headers: { 'content-type': img.mimeType } });
-    } catch (e) { return json({ error: String(e.message).slice(0, 300) }, 502); }
+    } catch (e) { return json({ error: String(e.message).slice(0, 900) }, 502); }
   }
 
   // The extension harvests Vinted's real dropdown options and posts them here;
